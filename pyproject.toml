@@ -1,0 +1,246 @@
+[project]
+name = "cosmos-synthesizer"
+
+# Dynamic version numbers from git
+dynamic = ["version"]
+
+# Tagline for Synthesizer
+description = "A package for synthetic observations of the Universe"
+
+# A longer description of Synthesizer
+readme = "README.md"
+
+# Minimum Python version
+requires-python = ">=3.8"
+
+# The licence
+license = {file = "LICENSE.md"}
+
+# Project keywords
+keywords =[
+  "galaxy",
+  "modelling",
+  "smoothed particle hydrodynamics",
+  "particles",
+  "nbody",
+  "galaxy formation",
+  "parametric",
+  "theory",
+  "sph",
+  "cosmology",
+  "galaxy evolution",
+  "survey",
+  "space telescope",
+  "SED",
+  "sed",
+  "spectral energy distribution",
+  "stellar population",
+  "synthesis",
+]
+
+# Synthesizer authors
+authors = [
+  {name = "C. S. Fournier", email = "connor.sant.17@um.edu.mt"},
+  {name = "C. C. Lovell", email = "christopher.lovell@port.ac.uk" },
+  {name = "W. J. Roper", email = "w.roper@sussex.ac.uk" },
+  {name = "L. Seeyave", email = "L.Seeyave@sussex.ac.uk"},
+  {name = "A. P. Vijayan", email = "apavi@space.dtu.dk" },
+  {name = "S. M. Wilkins", email = "s.wilkins@sussex.ac.uk" },
+  {name = "K. Iyer", email = "kartheikiyer@gmail.com" },
+  {name = "S. Newman", email = "sophie.newman@port.ac.uk" },
+]
+
+# Synthesizer maintainers
+maintainers = [
+  {name = "C. C. Lovell", email = "christopher.lovell@port.ac.uk" },
+  {name = "W. J. Roper", email = "w.roper@sussex.ac.uk" },
+  {name = "A. P. Vijayan", email = "apavi@space.dtu.dk" },
+  {name = "S. M. Wilkins", email = "s.wilkins@sussex.ac.uk" },
+]
+
+# Classifiers
+classifiers = [  # Optional
+  "Development Status :: 4 - Beta",  # 3 Alpha/4 Beta/5 Production/Stable
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Astronomy",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+
+  # Supported Python versions
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3 :: Only",
+]
+
+# Dependencies
+dependencies = [
+  "setuptools",
+  "astropy",
+  "h5py",
+  "numpy >= 1.23",
+  "packaging",
+  "scipy",
+  "unyt",
+  "cmasher",
+  "dust_extinction",
+  "matplotlib",
+  "spectres",
+  "tqdm",
+  "requests",
+  "pathos",
+  "statsmodels",
+  "pympler",
+  "platformdirs",
+]
+
+# Optional dependencies for specific use cases
+[project.optional-dependencies]
+# Development
+dev = [
+    "ruff==0.11.7",
+    "pre-commit",
+    "nb-clean",
+]
+# Testing
+test = [
+    "nbmake",
+    "pytest",
+    "ruff==0.11.7",
+    "mypy>=0.910",
+]
+# Documentation building
+docs = [
+    "nbmake",
+    "sphinx==7.4.7",
+    "pandoc",
+    "furo",
+    "sphinx_autodoc_typehints",
+    "ipython",
+    "sphinx_gallery",
+    "pillow",
+    "sphinx-toolbox",
+    "nbsphinx",
+    "sphinx-copybutton",
+    "readthedocs-sphinx-search",
+]
+
+# Simulation specifc loader dependancies
+bluetides = [
+    "bigfile",
+]
+eagle = [
+    "schwimmbad",
+]
+
+# Project urls
+[project.urls]
+"Homepage" = "https://github.com/synthesizer-project/synthesizer"
+"Bug Reports" = "https://github.com/synthesizer-project/synthesizer/issues"
+"Source" = "https://github.com/synthesizer-project/synthesizer"
+"Documentation" = "https://synthesizer-project.github.io/synthesizer/"
+
+# Entry points
+[project.scripts]
+synthesizer-init = "synthesizer.data.initialise:synth_initialise"
+synthesizer-clear = "synthesizer.data.initialise:synth_clear_data"
+synthesizer-download="synthesizer.downloader.downloader:download"
+
+# Package data
+[tool.setuptools.package-data]
+data = ["src/synthesizer/data/*.txt", "src/synthesizer/data/*.npz"]
+
+# Set up the build system
+[build-system]
+
+# Use latest setuotools, setuptools_scm for git versioning and
+# numpy (numpy includes are needed for compilation of C extensions)
+requires = ["setuptools>=64", "setuptools_scm>=8", "numpy>=1.23"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+
+# Make a version file at build time
+version_file = "src/synthesizer/_version.py"
+
+# Configure the linter and formatter
+[tool.ruff]
+
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    ".DS_Store",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+    ".pre-commit-config.yaml",
+    "*__init__.py"  # ignore all init files
+]
+
+# PEP-8 line length
+line-length = 79
+indent-width = 4
+
+
+# Assume Python 3.8 by default regardless
+target-version = "py38"
+
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "D"]
+ignore = [
+       "E402",  # "module level import not at top of file" (isolate C imports in case python alternatives exist)
+       "F811",  # "redefinition of unused name from line N" (breaks quantity objects)
+       ]
+
+
+# Sort imports alphabetically
+extend-select = ["I"]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# For every .py under examples/, ignore all D-rules
+"examples/**/*.py" = ["D"]
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
