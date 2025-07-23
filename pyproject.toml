@@ -119,7 +119,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 
 # Make a version file at build time
-version_file = "src/swiftsim-utils/_version.py"
+version_file = "src/swiftsim_utils/_version.py"
 
 # Configure the linter and formatter
 [tool.ruff]
