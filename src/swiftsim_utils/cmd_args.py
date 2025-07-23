@@ -67,7 +67,7 @@ def _output_times_mode_setup(subparser: argparse._SubParsersAction) -> None:
         "-ft",
         type=float,
         default=None,
-        help="Time of the first snapshot in Gyrs.",
+        help="Time of the first snapshot in internal units.",
     )
     p_times.add_argument(
         "--first-snap-scale-factor",
@@ -91,7 +91,7 @@ def _output_times_mode_setup(subparser: argparse._SubParsersAction) -> None:
         "-dt",
         type=float,
         default=None,
-        help="Time interval between snapshots in Gyrs.",
+        help="Time interval between snapshots in internal units.",
     )
     p_times.add_argument(
         "--delta-scale-factor",
@@ -123,7 +123,7 @@ def _output_times_mode_setup(subparser: argparse._SubParsersAction) -> None:
         "-sdt",
         type=float,
         default=None,
-        help="Time interval between snipshots in Gyrs.",
+        help="Time interval between snipshots in internal units.",
     )
     p_times.add_argument(
         "--snipshot-delta-scale-factor",
@@ -138,6 +138,30 @@ def _output_times_mode_setup(subparser: argparse._SubParsersAction) -> None:
         type=float,
         default=None,
         help="Logarithmic scale factor interval between snipshots.",
+    )
+
+    # We will also need to the final snapshot, for redshift and scale factor
+    # this has a well defined default, for time it does not.
+    p_times.add_argument(
+        "--final-snap-z",
+        "-fzf",
+        type=float,
+        default=0.0,
+        help="Redshift of the final snapshot to include (default: 0.0).",
+    )
+    p_times.add_argument(
+        "--final-snap-time",
+        "-ftf",
+        type=float,
+        default=None,
+        help="Time of the final snapshot in internal units (default: None).",
+    )
+    p_times.add_argument(
+        "--final-snap-scale-factor",
+        "-faf",
+        type=float,
+        default=1.0,
+        help="Scale factor of the final snapshot to include (default: 1.0).",
     )
 
 

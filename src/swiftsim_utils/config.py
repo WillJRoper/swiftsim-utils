@@ -1,6 +1,6 @@
 """A module containing tools for permenantly configuring SWIFT-utils."""
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import yaml
@@ -64,6 +64,11 @@ def get_configuration(
         validator=PathExistsValidator(),
     ).strip()
 
+    # Convert paths to absolute paths (relative paths are useless in the
+    # configuration file if we then run elsewhere)
+    swift_repo = Path(swift_repo).expanduser().resolve()
+    data_dir = Path(data_dir).expanduser().resolve()
+
     return SwiftConfig(
         Path(swift_repo).expanduser(), Path(data_dir).expanduser()
     )
@@ -81,6 +86,8 @@ def config_swift_utils() -> None:
     if config_file.exists():
         with open(config_file, "r") as f:
             config_data = yaml.safe_load(f)
+        if config_data is None:  # Handle case where the file is empty
+            config_data = {}
         default_swift = config_data.get("swiftsim_dir", None)
         default_data = config_data.get("data_dir", None)
     else:
@@ -93,6 +100,40 @@ def config_swift_utils() -> None:
         default_data=default_data,
     )
 
-    # Convert the dataclass to a dictionary and write it to a YAML file
+    # Convert the dataclass to a dictionary
+    data = asdict(config)
+
+    # Convert all Paths to strings for YAML serialization
+    for k, v in data.items():
+        if isinstance(v, Path):
+            data[k] = str(v)
+
+    # Write the configuration to the YAML file
     with open(config_file, "w") as f:
-        yaml.dump(config.__dict__, f, default_flow_style=False)
+        yaml.dump(data, f, default_flow_style=False)
+
+    print("Configuration saved to", config_file)
+
+
+def load_swift_config() -> SwiftConfig:
+    """Load the SWIFT-utils configuration from the config file.
+
+    Returns:
+        SwiftConfig: The loaded configuration.
+    """
+    config_file = Path.home() / ".swiftsim-utils" / "config.yaml"
+
+    if not config_file.exists():
+        raise FileNotFoundError(f"Configuration file not found: {config_file}")
+
+    with open(config_file, "r") as f:
+        config_data = yaml.safe_load(f)
+
+    # If we don't have a config yet return an empty one
+    if config_data is None:
+        return SwiftConfig(None, None)
+
+    return SwiftConfig(
+        Path(config_data["swiftsim_dir"]),
+        Path(config_data["data_dir"]),
+    )
