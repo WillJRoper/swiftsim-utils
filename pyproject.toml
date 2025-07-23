@@ -1,17 +1,17 @@
 [project]
-name = "cosmos-synthesizer"
+name = "swiftsim-cli"
 
 # Dynamic version numbers from git
 dynamic = ["version"]
 
-# Tagline for Synthesizer
-description = "A package for synthetic observations of the Universe"
+# Tagline for SWIFTSim CLI
+description = "A package full of helpers and tools for running SWIFT simulations."
 
 # A longer description of Synthesizer
 readme = "README.md"
 
 # Minimum Python version
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 # The licence
 license = {file = "LICENSE.md"}
@@ -24,38 +24,22 @@ keywords =[
   "particles",
   "nbody",
   "galaxy formation",
-  "parametric",
   "theory",
   "sph",
   "cosmology",
   "galaxy evolution",
-  "survey",
-  "space telescope",
-  "SED",
-  "sed",
-  "spectral energy distribution",
-  "stellar population",
-  "synthesis",
+  "command line",
+  "cli",
 ]
 
-# Synthesizer authors
+# SWIFTSim-CLI authors
 authors = [
-  {name = "C. S. Fournier", email = "connor.sant.17@um.edu.mt"},
-  {name = "C. C. Lovell", email = "christopher.lovell@port.ac.uk" },
   {name = "W. J. Roper", email = "w.roper@sussex.ac.uk" },
-  {name = "L. Seeyave", email = "L.Seeyave@sussex.ac.uk"},
-  {name = "A. P. Vijayan", email = "apavi@space.dtu.dk" },
-  {name = "S. M. Wilkins", email = "s.wilkins@sussex.ac.uk" },
-  {name = "K. Iyer", email = "kartheikiyer@gmail.com" },
-  {name = "S. Newman", email = "sophie.newman@port.ac.uk" },
 ]
 
-# Synthesizer maintainers
+# SWIFTSim-CLI maintainers
 maintainers = [
-  {name = "C. C. Lovell", email = "christopher.lovell@port.ac.uk" },
   {name = "W. J. Roper", email = "w.roper@sussex.ac.uk" },
-  {name = "A. P. Vijayan", email = "apavi@space.dtu.dk" },
-  {name = "S. M. Wilkins", email = "s.wilkins@sussex.ac.uk" },
 ]
 
 # Classifiers
@@ -81,16 +65,7 @@ dependencies = [
   "packaging",
   "scipy",
   "unyt",
-  "cmasher",
-  "dust_extinction",
-  "matplotlib",
-  "spectres",
-  "tqdm",
-  "requests",
-  "pathos",
-  "statsmodels",
-  "pympler",
-  "platformdirs",
+  "prompt_toolkit",
 ]
 
 # Optional dependencies for specific use cases
@@ -99,18 +74,17 @@ dependencies = [
 dev = [
     "ruff==0.11.7",
     "pre-commit",
-    "nb-clean",
 ]
+
 # Testing
 test = [
-    "nbmake",
     "pytest",
     "ruff==0.11.7",
     "mypy>=0.910",
 ]
+
 # Documentation building
 docs = [
-    "nbmake",
     "sphinx==7.4.7",
     "pandoc",
     "furo",
@@ -119,35 +93,20 @@ docs = [
     "sphinx_gallery",
     "pillow",
     "sphinx-toolbox",
-    "nbsphinx",
     "sphinx-copybutton",
     "readthedocs-sphinx-search",
 ]
 
-# Simulation specifc loader dependancies
-bluetides = [
-    "bigfile",
-]
-eagle = [
-    "schwimmbad",
-]
-
 # Project urls
 [project.urls]
-"Homepage" = "https://github.com/synthesizer-project/synthesizer"
-"Bug Reports" = "https://github.com/synthesizer-project/synthesizer/issues"
-"Source" = "https://github.com/synthesizer-project/synthesizer"
-"Documentation" = "https://synthesizer-project.github.io/synthesizer/"
+"Homepage" = "https://github.com/WillJRoper/swiftsim-utils"
+"Bug Reports" = "https://github.com/WillJRoper/swiftsim-utils/issues"
+"Source" = "https://github.com/WillJRoper/swiftsim-utils/tree/main/src/swiftsim-utils"
+"Documentation" = "..."
 
 # Entry points
 [project.scripts]
-synthesizer-init = "synthesizer.data.initialise:synth_initialise"
-synthesizer-clear = "synthesizer.data.initialise:synth_clear_data"
-synthesizer-download="synthesizer.downloader.downloader:download"
-
-# Package data
-[tool.setuptools.package-data]
-data = ["src/synthesizer/data/*.txt", "src/synthesizer/data/*.npz"]
+swift-cli="swiftsim_utils.cli:main"
 
 # Set up the build system
 [build-system]
@@ -160,7 +119,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 
 # Make a version file at build time
-version_file = "src/synthesizer/_version.py"
+version_file = "src/swiftsim-utils/_version.py"
 
 # Configure the linter and formatter
 [tool.ruff]
