@@ -2,6 +2,7 @@
 
 from swiftsim_utils.cmd_args import SwiftUtilsArgs
 from swiftsim_utils.config import config_swift_utils, load_swift_config
+from swiftsim_utils.output_list import generate_output_list
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -19,5 +20,5 @@ def main(argv: list[str] | None = None) -> None:
     # Run the appropriate command based on the mode
     if args.mode == "config":
         config_swift_utils()
-    elif args.mode == "version":
-        print(f"SWIFT-utils version: {args.version}")
+    elif args.mode == "output-times":
+        generate_output_list(vars(args))

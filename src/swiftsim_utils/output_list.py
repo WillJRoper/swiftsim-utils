@@ -3,7 +3,7 @@
 import numpy as np
 
 
-def generate_output_list(args: list[str]) -> None:
+def generate_output_list(args: dict) -> None:
     """Generate an output list file containing times for each snapshot.
 
     Args:
@@ -33,6 +33,22 @@ def generate_output_list(args: list[str]) -> None:
     doing_z = first_snap_z is not None
     doing_time = first_snap_time is not None
     doing_scale_factor = first_snap_scale_factor is not None
+
+    # Were we given a start?
+    if not (doing_z or doing_time or doing_scale_factor):
+        raise ValueError(
+            "You must specify the first snapshot in terms of redshift, "
+            "time, or scale factor."
+        )
+
+    # We're we given a delta?
+    if not (
+        delta_z or delta_time or delta_scale_factor or delta_log_scale_factor
+    ):
+        raise ValueError(
+            "You must specify the delta between snapshots in terms of "
+            "redshift, time, scale factor, or logarithmic scale factor."
+        )
 
     # Do we have everything we need?
     if doing_z and not delta_z:
@@ -164,14 +180,19 @@ def generate_output_list(args: list[str]) -> None:
         else 10
         ** np.arange(np.log10(first_snap), np.log10(final_snap) + delta, delta)
     )
-    snipshot_times = (
-        np.arange(first_snap, final_snap + snip_delta, snip_delta)
-        if not doing_snip_log_scale_factor
-        else 10
-        ** np.arange(
-            np.log10(first_snap), np.log10(final_snap) + snip_delta, snip_delta
+    if has_snipshots:
+        snipshot_times = (
+            np.arange(first_snap, final_snap + snip_delta, snip_delta)
+            if not doing_snip_log_scale_factor
+            else 10
+            ** np.arange(
+                np.log10(first_snap),
+                np.log10(final_snap) + snip_delta,
+                snip_delta,
+            )
         )
-    )
+    else:
+        snipshot_times = np.array([])
 
     # No point in doubling up on snapshots and snipshots, remove any snipshots
     # that are already in the snapshot list.
