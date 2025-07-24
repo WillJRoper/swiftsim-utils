@@ -1,6 +1,7 @@
 """A module containing tools for permenantly configuring SWIFT-utils."""
 
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 from pathlib import Path
 
 import yaml
@@ -115,7 +116,7 @@ def config_swift_utils() -> None:
     print("Configuration saved to", config_file)
 
 
-def load_swift_config() -> SwiftConfig:
+def _load_swift_config() -> SwiftConfig:
     """Load the SWIFT-utils configuration from the config file.
 
     Returns:
@@ -137,3 +138,16 @@ def load_swift_config() -> SwiftConfig:
         Path(config_data["swiftsim_dir"]),
         Path(config_data["data_dir"]),
     )
+
+
+@lru_cache(maxsize=1)
+def load_swift_config() -> SwiftConfig:
+    """Load the SWIFT-utils configuration.
+
+    This function caches the result to avoid reloading the configuration
+    multiple times.
+
+    Returns:
+        SwiftConfig: The loaded configuration.
+    """
+    return _load_swift_config()

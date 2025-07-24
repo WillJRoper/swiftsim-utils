@@ -1,7 +1,10 @@
 """Argument collector for swift-utils."""
 
 import argparse
+from pathlib import Path
 from typing import Literal, Sequence
+
+from swiftsim_utils.config import load_swift_config
 
 Mode = Literal[
     "config",
@@ -10,12 +13,46 @@ Mode = Literal[
 ]
 
 
+def _add_common_arguments(common: argparse.ArgumentParser) -> None:
+    """Add common arguments to a parser."""
+    # Common arguments for all modes (all are optional)
+    common.add_argument(
+        "-p",
+        "--params",
+        type=Path,
+        help="Path to a parameter file.",
+        default=None,
+    )
+
+    # Get the config
+    config = load_swift_config()
+    swift_dir = config.swift_dir if config else None
+    data_dir = config.data_dir if config else None
+
+    # Overrides to the config file
+    common.add_argument(
+        "--swift-dir",
+        type=Path,
+        help="Path to the SWIFT directory (overrides "
+        f"config file: {swift_dir}).",
+        default=None,
+    )
+    common.add_argument(
+        "--data-dir",
+        type=Path,
+        help="Path to the data directory (overrides "
+        f"config file: {data_dir}).",
+        default=None,
+    )
+
+
 def _config_mode_setup(subparser: argparse._SubParsersAction) -> None:
     """Add arguments for the 'init' mode."""
     p_init = subparser.add_parser(
         "config",
         help="Configure SWIFT-utils settings.",
     )
+    _add_common_arguments(p_init)
     # No other arguments, this will just walk the user through the config.
 
 
@@ -25,6 +62,7 @@ def _new_mode_setup(subparser: argparse._SubParsersAction) -> None:
         "new",
         help="Create a new SWIFT run directory.",
     )
+    _add_common_arguments(p_new)
     p_new.add_argument(
         "--path",
         required=True,
@@ -44,6 +82,7 @@ def _output_times_mode_setup(subparser: argparse._SubParsersAction) -> None:
         help="Generate an output list file containing times for each"
         " snap/snipshot.",
     )
+    _add_common_arguments(p_times)
 
     # We always need the output file
     p_times.add_argument(

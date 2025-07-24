@@ -11,11 +11,12 @@ def main(argv: list[str] | None = None) -> None:
     Args:
         argv: The command-line arguments to parse. If None, uses sys.argv.
     """
+    # Load the config first, we may need it later and this will cache it for
+    # future use.
+    config = load_swift_config()
+
     # Parse the command-line arguments
     args = SwiftUtilsArgs(argv).args
-
-    # Load the config, we may need it later
-    config = load_swift_config()
 
     # Run the appropriate command based on the mode
     if args.mode == "config":

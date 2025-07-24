@@ -41,7 +41,7 @@ def generate_output_list(args: dict) -> None:
             "time, or scale factor."
         )
 
-    # We're we given a delta?
+    # Were we given a delta?
     if not (
         delta_z or delta_time or delta_scale_factor or delta_log_scale_factor
     ):
