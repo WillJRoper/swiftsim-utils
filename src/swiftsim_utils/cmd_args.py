@@ -19,7 +19,7 @@ def _add_common_arguments(common: argparse.ArgumentParser) -> None:
 
     # Get the config
     config = load_swift_config()
-    swift_dir = config.swift_dir if config else None
+    swift_dir = config.swiftsim_dir if config else None
     data_dir = config.data_dir if config else None
 
     # Overrides to the config file

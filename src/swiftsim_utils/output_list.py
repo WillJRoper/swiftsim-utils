@@ -634,10 +634,7 @@ def _generate_output_list_with_cosmo(args: dict, cosmo) -> None:
             f"before the beginning of the simulation ({a_begin})."
         )
     else:
-        raise ValueError(
-            "You surely haven't been able to get here, something went "
-            "very wrong!"
-        )
+        pass  # nothing to do, we are good
 
     # Check that this final snap is before a_end in the parameter file
     a_end = params["Cosmology"]["a_end"]
@@ -672,10 +669,7 @@ def _generate_output_list_with_cosmo(args: dict, cosmo) -> None:
             f"after the end of the simulation ({a_end})."
         )
     else:
-        raise ValueError(
-            "You surely haven't been able to get here, something went "
-            "very wrong!"
-        )
+        pass  # nothing to do, we are good
 
     # Get the output list of times for the snapshots
     if doing_z:

@@ -2,6 +2,8 @@
 
 from functools import lru_cache
 
+import astropy.cosmology.core
+import astropy.units as u
 from astropy.cosmology import FlatLambdaCDM, z_at_value
 
 from swiftsim_utils.params import load_parameters
@@ -56,7 +58,7 @@ def convert_redshift_to_time(redshift: float) -> float:
         float: The time in seconds corresponding to the given redshift.
     """
     cosmo = get_cosmology()
-    return cosmo.age(redshift)
+    return cosmo.age(redshift).value
 
 
 def convert_time_to_redshift(time: float) -> float:
@@ -69,7 +71,10 @@ def convert_time_to_redshift(time: float) -> float:
         float: The redshift corresponding to the given time.
     """
     cosmo = get_cosmology()
-    return z_at_value(cosmo.age, time)
+    try:
+        return z_at_value(cosmo.age, time * u.Gyr, zmax=140, zmin=0.0).value
+    except astropy.cosmology.core.CosmologyError:
+        return 0.0
 
 
 def convert_scale_factor_to_redshift(scale_factor: float) -> float:

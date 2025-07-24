@@ -59,6 +59,7 @@ classifiers = [  # Optional
 # Dependencies
 dependencies = [
   "setuptools",
+  "astropy",
   "h5py",
   "numpy >= 1.23",
   "packaging",
