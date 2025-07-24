@@ -16,13 +16,6 @@ Mode = Literal[
 def _add_common_arguments(common: argparse.ArgumentParser) -> None:
     """Add common arguments to a parser."""
     # Common arguments for all modes (all are optional)
-    common.add_argument(
-        "-p",
-        "--params",
-        type=Path,
-        help="Path to a parameter file.",
-        default=None,
-    )
 
     # Get the config
     config = load_swift_config()
@@ -90,6 +83,16 @@ def _output_times_mode_setup(subparser: argparse._SubParsersAction) -> None:
         "-o",
         default="output_list.txt",
         help="Output file for the list of times.",
+    )
+
+    # We can optionally provide a parameter file, this will be used to
+    # get cosmology parameters and other settings.
+    p_times.add_argument(
+        "-p",
+        "--params",
+        type=Path,
+        help="Path to a parameter file.",
+        default=None,
     )
 
     # We will always need one definition of the first snapshot but this can be
