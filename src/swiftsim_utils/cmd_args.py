@@ -12,6 +12,9 @@ Mode = Literal[
     "config",
     "new",
     "output-times",
+    "update",
+    "switch",
+    "compile",
 ]
 
 
@@ -242,6 +245,51 @@ def _output_times_mode_setup(subparser: argparse._SubParsersAction) -> None:
         type=float,
         default=1.0,
         help="Scale factor of the final snapshot to include (default: 1.0).",
+    )
+
+
+def _update_mode_setup(subparser: argparse._SubParsersAction) -> None:
+    """Add arguments for the 'update' mode."""
+    p_update = subparser.add_parser(
+        "update",
+        help="Pull the latest changes from the SWIFT repository.",
+    )
+    _add_common_arguments(p_update)
+    # Again, there are no additional arguments for this mode, it will just
+    # run the git pull command in the SWIFT directory.
+
+
+def _switch_mode_setup(subparser: argparse._SubParsersAction) -> None:
+    """Add arguments for the 'switch' mode."""
+    p_switch = subparser.add_parser(
+        "switch",
+        help="Switch between different SWIFT branches.",
+    )
+    _add_common_arguments(p_switch)
+
+    # Add the nameless argument for the branch to switch to.
+    p_switch.add_argument(
+        "branch",
+        type=str,
+        help="The branch to switch to in the SWIFT repository.",
+    )
+
+
+def _compile_mode_setup(subparser: argparse._SubParsersAction) -> None:
+    """Add arguments for the 'compile' mode."""
+    p_compile = subparser.add_parser(
+        "compile",
+        help="Compile the SWIFT code.",
+    )
+    _add_common_arguments(p_compile)
+
+    # Add the number of threads to use for compilation.
+    p_compile.add_argument(
+        "--nr-threads",
+        "-j",
+        type=int,
+        default=1,
+        help="Number of threads to use for compilation (default: 1).",
     )
 
 

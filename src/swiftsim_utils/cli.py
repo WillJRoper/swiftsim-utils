@@ -4,7 +4,13 @@ from swiftsim_utils.cmd_args import SwiftUtilsArgs
 from swiftsim_utils.config import config_swift_utils, load_swift_config
 from swiftsim_utils.output_list import generate_output_list
 from swiftsim_utils.params import load_parameters
-from swiftsim_utils.swiftsim_dir import config_swiftsim, show_config_options
+from swiftsim_utils.swiftsim_dir import (
+    compile_swift,
+    config_swiftsim,
+    show_config_options,
+    switch_swift_branch,
+    update_swift,
+)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -37,3 +43,15 @@ def main(argv: list[str] | None = None) -> None:
                 opts=args.options,
                 swift_dir=args.swift_dir,
             )
+    elif args.mode == "update":
+        update_swift(args.swift_dir)
+    elif args.mode == "switch-branch":
+        switch_swift_branch(
+            branch=args.branch,
+            swift_dir=args.swift_dir,
+        )
+    elif args.mode == "compile":
+        compile_swift(
+            swift_dir=args.swift_dir,
+            nr_threads=args.nr_threads,
+        )
