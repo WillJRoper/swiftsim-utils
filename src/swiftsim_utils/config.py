@@ -11,7 +11,7 @@ from prompt_toolkit.validation import ValidationError, Validator
 
 
 @dataclass(slots=True)
-class SwiftConfig:
+class SwiftCLIConfig:
     """Configuration for SWIFT-utils.
 
     Attributes:
@@ -36,10 +36,10 @@ class PathExistsValidator(Validator):
             )
 
 
-def get_configuration(
+def get_cli_configuration(
     default_swift: str | None = None,
     default_data: str | None = None,
-) -> SwiftConfig:
+) -> SwiftCLIConfig:
     """Interactively collect config values for SWIFT-utils.
 
     Args:
@@ -47,7 +47,7 @@ def get_configuration(
         default_data: Optional default data directory.
 
     Returns:
-        SwiftConfig: Collected configuration.
+        SwiftCLIConfig: Collected configuration.
     """
     path_completer = PathCompleter(expanduser=True, only_directories=True)
 
@@ -70,7 +70,7 @@ def get_configuration(
     swift_repo = Path(swift_repo).expanduser().resolve()
     data_dir = Path(data_dir).expanduser().resolve()
 
-    return SwiftConfig(
+    return SwiftCLIConfig(
         Path(swift_repo).expanduser(), Path(data_dir).expanduser()
     )
 
@@ -96,7 +96,7 @@ def config_swift_utils() -> None:
         default_data = None
 
     # Collect configuration interactively
-    config = get_configuration(
+    config = get_cli_configuration(
         default_swift=default_swift,
         default_data=default_data,
     )
@@ -116,11 +116,11 @@ def config_swift_utils() -> None:
     print("Configuration saved to", config_file)
 
 
-def _load_swift_config() -> SwiftConfig:
+def _load_swift_config() -> SwiftCLIConfig:
     """Load the SWIFT-utils configuration from the config file.
 
     Returns:
-        SwiftConfig: The loaded configuration.
+        SwiftCLIConfig: The loaded configuration.
     """
     config_file = Path.home() / ".swiftsim-utils" / "config.yaml"
 
@@ -132,22 +132,22 @@ def _load_swift_config() -> SwiftConfig:
 
     # If we don't have a config yet return an empty one
     if config_data is None:
-        return SwiftConfig(None, None)
+        return SwiftCLIConfig(None, None)
 
-    return SwiftConfig(
+    return SwiftCLIConfig(
         Path(config_data["swiftsim_dir"]),
         Path(config_data["data_dir"]),
     )
 
 
 @lru_cache(maxsize=1)
-def load_swift_config() -> SwiftConfig:
+def load_swift_config() -> SwiftCLIConfig:
     """Load the SWIFT-utils configuration.
 
     This function caches the result to avoid reloading the configuration
     multiple times.
 
     Returns:
-        SwiftConfig: The loaded configuration.
+        SwiftCLIConfig: The loaded configuration.
     """
     return _load_swift_config()

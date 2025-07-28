@@ -4,10 +4,11 @@ from swiftsim_utils.cmd_args import SwiftUtilsArgs
 from swiftsim_utils.config import config_swift_utils, load_swift_config
 from swiftsim_utils.output_list import generate_output_list
 from swiftsim_utils.params import load_parameters
+from swiftsim_utils.swiftsim_dir import config_swiftsim, show_config_options
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Main entry point for the swiftsim-utils CLI tool.
+    """Run the SWIFT-utils command-line interface.
 
     Args:
         argv: The command-line arguments to parse. If None, uses sys.argv.
@@ -23,7 +24,16 @@ def main(argv: list[str] | None = None) -> None:
     _ = load_parameters(getattr(args, "params", None))
 
     # Run the appropriate command based on the mode
-    if args.mode == "config":
+    if args.mode == "init":
         config_swift_utils()
     elif args.mode == "output-times":
         generate_output_list(vars(args))
+    elif args.mode == "config":
+        # Are we just showing the config options?
+        if args.show:
+            show_config_options()
+        else:
+            config_swiftsim(
+                opts=args.options,
+                swift_dir=args.swift_dir,
+            )

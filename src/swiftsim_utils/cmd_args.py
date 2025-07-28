@@ -1,4 +1,4 @@
-"""Argument collector for swift-utils."""
+"""Argument collector for SWFTISim-CLI."""
 
 import argparse
 from pathlib import Path
@@ -6,7 +6,9 @@ from typing import Literal, Sequence
 
 from swiftsim_utils.config import load_swift_config
 
+# Declare the modes available for swift-utils.
 Mode = Literal[
+    "init",
     "config",
     "new",
     "output-times",
@@ -26,27 +28,61 @@ def _add_common_arguments(common: argparse.ArgumentParser) -> None:
     common.add_argument(
         "--swift-dir",
         type=Path,
-        help="Path to the SWIFT directory (overrides "
-        f"config file: {swift_dir}).",
+        help=(
+            "Path to the SWIFT directory (overrides "
+            f"config file: {swift_dir})."
+        ),
         default=None,
     )
     common.add_argument(
         "--data-dir",
         type=Path,
-        help="Path to the data directory (overrides "
-        f"config file: {data_dir}).",
+        help=(
+            f"Path to the data directory (overrides config file: {data_dir})."
+        ),
         default=None,
     )
 
 
-def _config_mode_setup(subparser: argparse._SubParsersAction) -> None:
+def _init_mode_setup(subparser: argparse._SubParsersAction) -> None:
     """Add arguments for the 'init' mode."""
     p_init = subparser.add_parser(
-        "config",
-        help="Configure SWIFT-utils settings.",
+        "init",
+        help="Configure SWIFTsim-CLI settings.",
     )
     _add_common_arguments(p_init)
     # No other arguments, this will just walk the user through the config.
+
+
+def _config_mode_setup(subparser: argparse._SubParsersAction) -> None:
+    """Add arguments for configuring SWIFT itself."""
+    p_config = subparser.add_parser(
+        "config",
+        help="Configure SWIFT configuration in the SWIFT directory.",
+    )
+    _add_common_arguments(p_config)
+
+    # Here we need to ingest an arbitrary length string containing all the
+    # config options.
+    p_config.add_argument(
+        "--options",
+        "-o",
+        type=str,
+        help=(
+            "Configuration options to set in the SWIFT config file as they"
+            " would be passed to the ./configure command."
+        ),
+        default="",
+    )
+
+    # Show the configuration options (equivalent to running
+    # `./configure --help`).
+    p_config.add_argument(
+        "--show",
+        "-s",
+        action="store_true",
+        help="Show the available configuration options.",
+    )
 
 
 def _new_mode_setup(subparser: argparse._SubParsersAction) -> None:
@@ -72,8 +108,10 @@ def _output_times_mode_setup(subparser: argparse._SubParsersAction) -> None:
     """Add arguments for the 'output-times' mode."""
     p_times = subparser.add_parser(
         "output-times",
-        help="Generate an output list file containing times for each"
-        " snap/snipshot.",
+        help=(
+            "Generate an output list file containing times for each"
+            " snap/snipshot."
+        ),
     )
     _add_common_arguments(p_times)
 
@@ -233,8 +271,6 @@ class SwiftUtilsArgs:
             )
         return getattr(self.args, name)
 
-    # ---------------------- internals ----------------------
-
     def _build_parser(self) -> argparse.ArgumentParser:
         """Build the argument parser for swift-utils.
 
@@ -257,6 +293,9 @@ class SwiftUtilsArgs:
             metavar="<mode>",
             required=True,
         )
+
+        # initialise
+        _init_mode_setup(subparsers)
 
         # config
         _config_mode_setup(subparsers)
