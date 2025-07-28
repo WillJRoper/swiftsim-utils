@@ -1,6 +1,5 @@
 """A module containing the machinery for creating a new SWIFT run."""
 
-import os
 import warnings
 from pathlib import Path
 
@@ -259,7 +258,7 @@ def make_new_run_dir(
     output_dir: Path,
     inicond_file: Path,
     swift_dir: Path | None = None,
-    dmo: bool = False,
+    overide_params: dict | None = None,
 ) -> None:
     """Create a new SWIFT run directory with a parameter file.
 
@@ -268,16 +267,15 @@ def make_new_run_dir(
         inicond_file: The initial conditions file to use for the new run.
         swift_dir: Optional path to the SWIFT directory. If None, uses the
             directory from the SWIFT-utils config.
-        dmo: If True, the parameters will be modified for a DMO run.
+        overide_params: Optional dictionary of parameters to override in the
     """
     # Ensure the output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Create the new parameters file
-    params = make_new_parameter_file(output_dir, inicond_file, swift_dir)
-
-    # Make some directories we will use
-    restart_dir = params["Restarts"]["subdir"]
-    snapshots_dir = params["Snapshots"]["subdir"]
-    os.makedirs(restart_dir, exist_ok=True)
-    os.makedirs(snapshots_dir, exist_ok=True)
+    _ = make_new_parameter_file(
+        output_dir,
+        inicond_file,
+        swift_dir,
+        overide_params,
+    )

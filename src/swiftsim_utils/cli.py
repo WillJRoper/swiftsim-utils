@@ -61,6 +61,5 @@ def main(argv: list[str] | None = None) -> None:
             output_dir=args.path,
             inicond_file=args.inic,
             swift_dir=args.swift_dir,
-            dmo=args.dmo,
             overide_params=dict(args.param),
         )
