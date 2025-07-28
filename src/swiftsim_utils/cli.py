@@ -1,6 +1,6 @@
 """The main module containing the swiftsim-utils CLI tool."""
 
-from swiftsim_utils.cmd_args import SwiftUtilsArgs
+from swiftsim_utils.cmd_args import SWIFTSimCLIArgs
 from swiftsim_utils.config import config_swift_utils, load_swift_config
 from swiftsim_utils.output_list import generate_output_list
 from swiftsim_utils.params import load_parameters
@@ -24,7 +24,7 @@ def main(argv: list[str] | None = None) -> None:
     _ = load_swift_config()
 
     # Parse the command-line arguments
-    args = SwiftUtilsArgs(argv).args
+    args = SWIFTSimCLIArgs(argv).args
 
     # Load the parameters if they exist
     _ = load_parameters(getattr(args, "params", None))

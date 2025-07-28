@@ -10,11 +10,11 @@ from swiftsim_utils.config import load_swift_config
 Mode = Literal[
     "init",
     "config",
-    "new",
     "output-times",
     "update",
     "switch",
     "compile",
+    "new",
 ]
 
 
@@ -85,25 +85,6 @@ def _config_mode_setup(subparser: argparse._SubParsersAction) -> None:
         "-s",
         action="store_true",
         help="Show the available configuration options.",
-    )
-
-
-def _new_mode_setup(subparser: argparse._SubParsersAction) -> None:
-    """Add arguments for the 'new' mode."""
-    p_new = subparser.add_parser(
-        "new",
-        help="Create a new SWIFT run directory.",
-    )
-    _add_common_arguments(p_new)
-    p_new.add_argument(
-        "--path",
-        required=True,
-        help="Path to the new SWIFT run.",
-    )
-    p_new.add_argument(
-        "--inic",
-        required=True,
-        help="Path to the initial conditions HDF5 file.",
     )
 
 
@@ -293,11 +274,30 @@ def _compile_mode_setup(subparser: argparse._SubParsersAction) -> None:
     )
 
 
-class SwiftUtilsArgs:
+def _new_mode_setup(subparser: argparse._SubParsersAction) -> None:
+    """Add arguments for the 'new' mode."""
+    p_new = subparser.add_parser(
+        "new",
+        help="Create a new SWIFT run directory.",
+    )
+    _add_common_arguments(p_new)
+    p_new.add_argument(
+        "--path",
+        required=True,
+        help="Path to the new SWIFT run.",
+    )
+    p_new.add_argument(
+        "--inic",
+        required=True,
+        help="Path to the initial conditions HDF5 file.",
+    )
+
+
+class SWIFTSimCLIArgs:
     """Builds and parses command-line arguments for swift-utils.
 
     Example:
-        opts = SwiftUtilsArgs()   # parses sys.argv by default
+        opts = SWIFTSimCLIArgs()   # parses sys.argv by default
     """
 
     def __init__(self, argv: Sequence[str] | None = None) -> None:
