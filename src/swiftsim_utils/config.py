@@ -139,10 +139,12 @@ def _load_swift_config() -> SwiftCLIConfig:
     Returns:
         SwiftCLIConfig: The loaded configuration.
     """
+    # Define the path to the config file
     config_file = Path.home() / ".swiftsim-utils" / "config.yaml"
 
+    # Return a dummy if the config file does not yet exist
     if not config_file.exists():
-        raise FileNotFoundError(f"Configuration file not found: {config_file}")
+        return SwiftCLIConfig(None, None, 0.04, 2.7)
 
     with open(config_file, "r") as f:
         config_data = yaml.safe_load(f)
