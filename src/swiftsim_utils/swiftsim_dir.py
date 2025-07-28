@@ -154,7 +154,7 @@ def switch_swift_branch(branch: str, swift_dir: Path | None = None) -> None:
     _run_command_in_swift_dir(f"git checkout {branch}", swift_dir)
 
 
-def compile_swift(swift_dir: Path | None = None, nr_threads: int = 1) -> None:
+def make_swift(swift_dir: Path | None = None, nr_threads: int = 1) -> None:
     """Compile the SWIFT simulation code.
 
     This will navigate to the SWIFT directory (erroring if there is not one

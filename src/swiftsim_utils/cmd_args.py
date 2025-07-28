@@ -62,21 +62,12 @@ def _config_mode_setup(subparser: argparse._SubParsersAction) -> None:
     p_config = subparser.add_parser(
         "config",
         help="Configure SWIFT configuration in the SWIFT directory.",
+        usage=(
+            "swift-cli config [-h] [--swift-dir SWIFT_DIR]"
+            " [--data-dir DATA_DIR] [--show] [<configuration options> ...]"
+        ),
     )
     _add_common_arguments(p_config)
-
-    # Here we need to ingest an arbitrary length string containing all the
-    # config options.
-    p_config.add_argument(
-        "--options",
-        "-o",
-        type=str,
-        help=(
-            "Configuration options to set in the SWIFT config file as they"
-            " would be passed to the ./configure command."
-        ),
-        default="",
-    )
 
     # Show the configuration options (equivalent to running
     # `./configure --help`).
@@ -256,11 +247,11 @@ def _switch_mode_setup(subparser: argparse._SubParsersAction) -> None:
     )
 
 
-def _compile_mode_setup(subparser: argparse._SubParsersAction) -> None:
+def _make_mode_setup(subparser: argparse._SubParsersAction) -> None:
     """Add arguments for the 'compile' mode."""
     p_compile = subparser.add_parser(
-        "compile",
-        help="Compile the SWIFT code.",
+        "make",
+        help="Compile SWIFT.",
     )
     _add_common_arguments(p_compile)
 
@@ -307,7 +298,21 @@ class SWIFTSimCLIArgs:
             argv: The command-line arguments to parse. If None, uses sys.argv.
         """
         self._parser = self._build_parser()
-        self.args = self._parser.parse_args(argv)
+
+        # If we are using any mode other than `config` we don't want to capture
+        # unknown arguments. This means we have to parse arugments safely first
+        args, unknowns = self._parser.parse_known_args(argv)
+
+        # If we are in config mode we can just assign the unknowns as config
+        # options and attach the arguments
+        if args.mode == "config":
+            args.options = unknowns
+            self.args = args
+
+        # Otherwise, we need to parse the arugments again, this time not
+        # capturing unknowns so as to ensure we error properly
+        else:
+            self.args = self._parser.parse_args(argv)
 
         self.mode: Mode = self.args.mode
 
@@ -326,7 +331,7 @@ class SWIFTSimCLIArgs:
             An argparse.ArgumentParser instance configured with subcommands.
         """
         parser = argparse.ArgumentParser(
-            prog="swift-utils",
+            prog="swift-cli",
             description="Utilities for Swift development workflows.",
         )
         parser.add_argument(
@@ -348,10 +353,19 @@ class SWIFTSimCLIArgs:
         # config
         _config_mode_setup(subparsers)
 
-        # new
-        _new_mode_setup(subparsers)
-
         # output-times
         _output_times_mode_setup(subparsers)
+
+        # update
+        _update_mode_setup(subparsers)
+
+        # switch
+        _switch_mode_setup(subparsers)
+
+        # compile
+        _make_mode_setup(subparsers)
+
+        # new
+        _new_mode_setup(subparsers)
 
         return parser
