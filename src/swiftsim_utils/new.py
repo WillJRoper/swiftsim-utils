@@ -33,10 +33,16 @@ def derive_params_from_ics(
     # Get the config
     config = load_swift_config()
 
+    # Ensure the initial conditions file exists
+    if not inicond_file.exists():
+        raise FileNotFoundError(
+            f"Initial conditions file does not exist: {inicond_file}"
+        )
+
     # Read the initial conditions file
     with h5py.File(inicond_file, "r") as hdf:
         # Get the box size from the initial conditions
-        box_size = hdf["Header"].attrs["BoxSize"][:]
+        box_size = hdf["Header"].attrs["BoxSize"]
 
         # How many particles do we have?
         ngas = hdf["Header"].attrs["NumPart_Total"][:][0]
@@ -49,7 +55,17 @@ def derive_params_from_ics(
             redshift = None
 
         # Derive a_begin from the redshift
-        a_begin = 1 / (1 + redshift)
+        if redshift is not None:
+            a_begin = 1 / (1 + redshift)
+        else:
+            a_begin = None
+
+        # We also might have Time as a beginning point, annoyingly, this could
+        # be a bog standard time or a scale factor depending on weather we are
+        # workign with or without cosmology
+        if "Time" in hdf["Header"].attrs:
+            time_begin = hdf["Header"].attrs["Time"]
+            a_begin = time_begin
 
         # If we have a Units group them get the unit system
         units = {}
@@ -66,11 +82,9 @@ def derive_params_from_ics(
 
         # Compute the mean separation of each particle type
         # (assuming a cubic box)
-        mean_separation_dm = box_size[0] / (ndm ** (1 / 3))
+        mean_separation_dm = box_size / (ndm ** (1 / 3))
         mean_separation_gas = (
-            (box_size[0] / (ngas ** (1 / 3)))
-            if ngas > 0
-            else mean_separation_dm
+            (box_size / (ngas ** (1 / 3))) if ngas > 0 else mean_separation_dm
         )  # if we have no gas in ics itll be generated from dm
 
         # Compute the softening lengths and their maximal values
@@ -81,21 +95,24 @@ def derive_params_from_ics(
 
     print("Setting softening lengths to:")
     print(
-        f"  Dark Matter: {dm_soft:.3e} (max (@{config.softening_pivot_z}):"
+        f"  Dark Matter: {dm_soft:.3e} (max @ z={config.softening_pivot_z}:"
         f" {max_dm_soft:.3e})"
     )
     print(
-        f"  Baryons:     {gas_soft:.3e} (max (@{config.softening_pivot_z}):"
+        f"  Baryons:     {gas_soft:.3e} (max @ z={config.softening_pivot_z}:"
         f" {max_gas_soft:.3e})"
     )
 
     # Update the parameters dictionary with the derived values
-    params["Gravity"]["comoving_DM_softening"] = dm_soft
-    params["Gravity"]["max_physical_DM_softening"] = max_dm_soft
-    params["Gravity"]["comoving_baryon_softening"] = gas_soft
-    params["Gravity"]["max_physical_baryon_softening"] = max_gas_soft
+    params["Gravity"]["comoving_DM_softening"] = str(dm_soft)
+    params["Gravity"]["max_physical_DM_softening"] = str(max_dm_soft)
+    params["Gravity"]["comoving_baryon_softening"] = str(gas_soft)
+    params["Gravity"]["max_physical_baryon_softening"] = str(max_gas_soft)
     if redshift is not None:
-        params["Cosmology"]["a_begin"] = a_begin
+        params["Cosmology"]["a_begin"] = str(a_begin)
+    if time_begin is not None:
+        params["Cosmology"]["a_begin"] = str(time_begin)
+        params["TimeIntegration"]["time_begin"] = str(time_begin)
     if len(units) > 0:
         if "Unit mass in cgs (U_M)" in units:
             params["InternalUnitSystem"]["UnitMass_in_cgs"] = units[
@@ -241,6 +258,9 @@ def make_new_parameter_file(
     # Set various directories
     params["Restarts"]["subdir"] = str(output_dir / "restart")
     params["Snapshots"]["subdir"] = str(output_dir / "snapshots")
+
+    # Derive parameters from the initial conditions file
+    params = derive_params_from_ics(inicond_file, params)
 
     # Apply any overrides provided by the user
     if overide_params is not None:
