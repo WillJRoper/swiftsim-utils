@@ -10,7 +10,7 @@ from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.validation import ValidationError, Validator
 
 
-@dataclass(slots=True)
+@dataclass()
 class SwiftCLIConfig:
     """Configuration for SWIFT-utils.
 
