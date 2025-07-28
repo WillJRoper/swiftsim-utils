@@ -2,7 +2,7 @@
 
 import argparse
 from pathlib import Path
-from typing import Literal, Sequence
+from typing import Literal, Sequence, Tuple
 
 from swiftsim_utils.config import load_swift_config
 
@@ -16,6 +16,20 @@ Mode = Literal[
     "compile",
     "new",
 ]
+
+
+def _kv_pair(arg: str) -> Tuple[str, str]:
+    """Parse a KEY=VALUE pair from a string.
+
+    Argparse “type” function: split a KEY=VALUE into a (key, value) tuple,
+    or raise an error if the syntax is wrong.
+    """
+    if "=" not in arg:
+        raise argparse.ArgumentTypeError(
+            f"invalid parameter override '{arg}'; expected KEY=VALUE"
+        )
+    key, val = arg.split("=", 1)
+    return key, val
 
 
 def _add_common_arguments(common: argparse.ArgumentParser) -> None:
@@ -276,11 +290,26 @@ def _new_mode_setup(subparser: argparse._SubParsersAction) -> None:
         "--path",
         required=True,
         help="Path to the new SWIFT run.",
+        type=Path,
     )
     p_new.add_argument(
         "--inic",
         required=True,
         help="Path to the initial conditions HDF5 file.",
+        type=Path,
+    )
+
+    # Add the ability to override internal pa
+    p_new.add_argument(
+        "--param",
+        metavar="KEY=VALUE",
+        type=_kv_pair,
+        action="append",
+        help=(
+            "Override a SWIFT parameter in the form ROOTKEY:KEY=VALUE.  "
+            "Can be repeated for multiple overrides."
+        ),
+        default=[],
     )
 
 

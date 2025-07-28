@@ -2,9 +2,16 @@
 
 from pathlib import Path
 
-import yaml
+from ruamel.yaml import YAML
 
 PARAMS: dict | None = None
+
+# Configure YAML for round-trip comment preservation and consistent formatting
+yaml = YAML()
+yaml.default_flow_style = False
+yaml.indent(mapping=4, sequence=4, offset=2)
+yaml.width = 80
+yaml.allow_unicode = True
 
 
 def _clean_yaml_text(text: str, spaces_per_tab: int = 4) -> str:
@@ -18,7 +25,7 @@ def _clean_yaml_text(text: str, spaces_per_tab: int = 4) -> str:
         A new string where every tab character is replaced by the
         specified number of spaces.
     """
-    return text.replace("	", " " * spaces_per_tab)
+    return text.expandtabs(spaces_per_tab)
 
 
 def _parse_parameters(param_file: Path) -> dict:
@@ -36,7 +43,7 @@ def _parse_parameters(param_file: Path) -> dict:
     """
     # Read raw content using a context manager
     try:
-        with open(param_file, "r", encoding="utf-8") as file:
+        with param_file.open("r", encoding="utf-8") as file:
             raw = file.read()
     except Exception as e:
         raise IOError(f"Could not read parameter file '{param_file}': {e}")
@@ -46,8 +53,8 @@ def _parse_parameters(param_file: Path) -> dict:
 
     # Parse YAML safely
     try:
-        return yaml.safe_load(cleaned) or {}
-    except yaml.YAMLError as e:
+        return yaml.load(cleaned) or {}
+    except Exception as e:
         # Add context and re-raise
         raise ValueError(f"Error parsing YAML in '{param_file}': {e}") from e
 

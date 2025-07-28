@@ -21,6 +21,8 @@ class SwiftCLIConfig:
 
     swiftsim_dir: Path
     data_dir: Path
+    softening_coeff: float = 0.04
+    softening_pivot_z: float = 2.7
 
 
 class PathExistsValidator(Validator):
@@ -65,13 +67,28 @@ def get_cli_configuration(
         validator=PathExistsValidator(),
     ).strip()
 
+    # Get the softening coefficient and pivot redshift, with a default values
+    softening_coeff = prompt(
+        "Softening coefficient in epsilon"
+        " = x * mean_separation (default x=0.04): ",
+        default="0.04",
+    ).strip()
+    softening_pivot_z = prompt(
+        "Softening pivot redshift (used for calculate maximal softening"
+        " lengths, default z=2.7): ",
+        default="2.7",
+    ).strip()
+
     # Convert paths to absolute paths (relative paths are useless in the
     # configuration file if we then run elsewhere)
     swift_repo = Path(swift_repo).expanduser().resolve()
     data_dir = Path(data_dir).expanduser().resolve()
 
     return SwiftCLIConfig(
-        Path(swift_repo).expanduser(), Path(data_dir).expanduser()
+        Path(swift_repo).expanduser(),
+        Path(data_dir).expanduser(),
+        float(softening_coeff),
+        float(softening_pivot_z),
     )
 
 
@@ -132,11 +149,13 @@ def _load_swift_config() -> SwiftCLIConfig:
 
     # If we don't have a config yet return an empty one
     if config_data is None:
-        return SwiftCLIConfig(None, None)
+        return SwiftCLIConfig(None, None, 0.04, 2.7)
 
     return SwiftCLIConfig(
         Path(config_data["swiftsim_dir"]),
         Path(config_data["data_dir"]),
+        float(config_data.get("softening_coeff", 0.04)),
+        float(config_data.get("softening_pivot_z", 2.7)),
     )
 
 

@@ -66,6 +66,7 @@ dependencies = [
   "scipy",
   "unyt",
   "prompt_toolkit",
+  "ruamel.yaml",
 ]
 
 # Optional dependencies for specific use cases

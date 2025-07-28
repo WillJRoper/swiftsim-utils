@@ -2,6 +2,7 @@
 
 from swiftsim_utils.cmd_args import SWIFTSimCLIArgs
 from swiftsim_utils.config import config_swift_utils, load_swift_config
+from swiftsim_utils.new import make_new_run_dir
 from swiftsim_utils.output_list import generate_output_list
 from swiftsim_utils.params import load_parameters
 from swiftsim_utils.swiftsim_dir import (
@@ -54,4 +55,12 @@ def main(argv: list[str] | None = None) -> None:
         make_swift(
             swift_dir=args.swift_dir,
             nr_threads=args.nr_threads,
+        )
+    elif args.mode == "new":
+        make_new_run_dir(
+            output_dir=args.path,
+            inicond_file=args.inic,
+            swift_dir=args.swift_dir,
+            dmo=args.dmo,
+            overide_params=dict(args.param),
         )
