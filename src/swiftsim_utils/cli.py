@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> None:
         )
     elif args.mode == "analyse":
         analyse_timestep_files(
-            files=args.files,
+            files=args.timesteps,
             labels=args.labels,
             plot_time=args.plot_time,
         )
