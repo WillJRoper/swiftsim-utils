@@ -4,6 +4,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.lines import Line2D
 
 
 def analyse_timestep_files(
@@ -65,7 +66,7 @@ def analyse_timestep_files(
     for i, (xi, yi, dt, label, color) in enumerate(
         zip(x, y, deadtime, labels, colors)
     ):
-        # Plot wall clock time (solid lines) - remove label since we have custom legend
+        # Plot wall clock time (solid lines)
         ax1.plot(
             xi,
             yi,
@@ -78,19 +79,29 @@ def analyse_timestep_files(
 
     # Set labels and title for main plot
     x_label = "Time [Internal Units]" if plot_time else "Scale factor"
-    ax1.set_ylabel("Wallclock Time [s]")
-    # Only show legend for wall clock lines (solid lines only)
-    handles, legend_labels = ax1.get_legend_handles_labels()
-    wall_clock_handles = [
-        h for h, l in zip(handles, legend_labels) if "(wall clock)" in l
+    ax1.set_ylabel("Time [hrs]")
+
+    # Create custom legend with black lines showing line styles
+    legend_elements = [
+        Line2D(
+            [0],
+            [0],
+            color="black",
+            linestyle="-",
+            linewidth=2,
+            label="Wallclock Time",
+        ),
+        Line2D(
+            [0],
+            [0],
+            color="black",
+            linestyle="--",
+            linewidth=2,
+            alpha=0.6,
+            label="Dead Time",
+        ),
     ]
-    wall_clock_labels = [l for l in legend_labels if "(wall clock)" in l]
-    ax1.legend(
-        wall_clock_handles,
-        wall_clock_labels,
-        bbox_to_anchor=(1.05, 1),
-        loc="upper left",
-    )
+    ax1.legend(handles=legend_elements, loc="best")
     ax1.grid(True, alpha=0.3)
 
     # Deadtime percentage plot
@@ -112,9 +123,9 @@ def analyse_timestep_files(
 
     # Set labels and formatting for deadtime percentage plot
     ax2.set_xlabel(x_label)
-    ax2.set_ylabel("Deadtime [%]")
+    ax2.set_ylabel("Dead Time [%]")
     ax2.grid(True, alpha=0.3)
-    ax2.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    ax2.legend(loc="best")
     ax2.set_ylim(0, None)  # Start y-axis at 0 for percentage
 
     # Adjust layout to prevent overlapping
