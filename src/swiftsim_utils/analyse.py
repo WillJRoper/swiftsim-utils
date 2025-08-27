@@ -58,6 +58,8 @@ def analyse_timestep_files(
         gridspec_kw={"height_ratios": [3, 1]},
         sharex=True,
     )
+    ax1.grid(True, alpha=0.3)
+    ax2.grid(True, alpha=0.3)
 
     # Colors for the plots
     colors = plt.cm.tab10(np.linspace(0, 1, len(files)))
