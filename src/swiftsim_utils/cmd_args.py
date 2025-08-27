@@ -313,6 +313,36 @@ def _new_mode_setup(subparser: argparse._SubParsersAction) -> None:
     )
 
 
+def _analyse_mode_setup(subparser: argparse._SubParsersAction) -> None:
+    """Add arguments for the 'analyse' mode."""
+    p_analyse = subparser.add_parser(
+        "analyse",
+        help="Analyse one or more SWIFT runs.",
+    )
+
+    _add_common_arguments(p_analyse)
+
+    p_analyse.add_argument(
+        "--timesteps",
+        "-t",
+        nargs="+",
+        required=False,
+        help="List of timestep files to analyse and produce a plot for.",
+        type=Path,
+        default=[],
+    )
+
+    p_analyse.add_argument(
+        "--labels",
+        "-l",
+        nargs="+",
+        required=True,
+        help="List of labels for the runs being analysed.",
+        type=str,
+        default=[],
+    )
+
+
 class SWIFTSimCLIArgs:
     """Builds and parses command-line arguments for swift-utils.
 
@@ -396,5 +426,8 @@ class SWIFTSimCLIArgs:
 
         # new
         _new_mode_setup(subparsers)
+
+        # compare
+        _compare_mode_setup(subparsers)
 
         return parser
