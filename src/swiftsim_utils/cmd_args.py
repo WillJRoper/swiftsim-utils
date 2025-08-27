@@ -342,6 +342,13 @@ def _analyse_mode_setup(subparser: argparse._SubParsersAction) -> None:
         default=[],
     )
 
+    p_analyse.add_argument(
+        "--plot-time",
+        action="store_true",
+        help="Plot against time (default is scale factor).",
+        default=False,
+    )
+
 
 class SWIFTSimCLIArgs:
     """Builds and parses command-line arguments for swift-utils.
@@ -427,7 +434,7 @@ class SWIFTSimCLIArgs:
         # new
         _new_mode_setup(subparsers)
 
-        # compare
-        _compare_mode_setup(subparsers)
+        # analyse
+        _analyse_mode_setup(subparsers)
 
         return parser

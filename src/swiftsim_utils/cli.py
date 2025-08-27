@@ -1,5 +1,6 @@
 """The main module containing the swiftsim-utils CLI tool."""
 
+from swiftsim_utils.analyse import analyse_timestep_files
 from swiftsim_utils.cmd_args import SWIFTSimCLIArgs
 from swiftsim_utils.config import config_swift_utils, load_swift_config
 from swiftsim_utils.new import make_new_run_dir
@@ -62,4 +63,10 @@ def main(argv: list[str] | None = None) -> None:
             inicond_file=args.inic,
             swift_dir=args.swift_dir,
             overide_params=dict(args.param),
+        )
+    elif args.mode == "analyse":
+        analyse_timestep_files(
+            files=args.files,
+            labels=args.labels,
+            plot_time=args.plot_time,
         )
