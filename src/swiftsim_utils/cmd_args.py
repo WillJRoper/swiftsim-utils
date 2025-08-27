@@ -349,6 +349,29 @@ def _analyse_mode_setup(subparser: argparse._SubParsersAction) -> None:
         default=False,
     )
 
+    p_analyse.add_argument(
+        "--output-path",
+        "-o",
+        type=Path,
+        help="Where to save analysis (default: current directory).",
+        default=None,
+    )
+
+    p_analyse.add_argument(
+        "--prefix",
+        "-p",
+        type=str,
+        help="A prefix to add to the analysis files (default: '').",
+        default="",
+    )
+
+    p_analyse.add_argument(
+        "--show",
+        action="store_true",
+        help="Show the plot interactively.",
+        default=False,
+    )
+
 
 class SWIFTSimCLIArgs:
     """Builds and parses command-line arguments for swift-utils.

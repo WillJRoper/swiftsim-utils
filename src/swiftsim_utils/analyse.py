@@ -1,5 +1,7 @@
 """A module containing tools for analysing SWIFT runs."""
 
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -8,6 +10,9 @@ def analyse_timestep_files(
     files: list[str],
     labels: list[str],
     plot_time: bool = True,
+    output_path: str | None = None,
+    prefix: str = None,
+    show_plot: bool = True,
 ) -> None:
     """Plot the timestep files of one or more SWIFT runs.
 
@@ -16,6 +21,10 @@ def analyse_timestep_files(
         labels: List of labels for the runs.
         plot_time: Whether to plot against time or scale factor. If True, plot
             against time, otherwise plot against scale factor.
+        output_path: Optional path to save the plot. If None, the plot is saved
+            to the current directory.
+        prefix: Optional prefix to add to the output filename if saving.
+            If empty, defaults to 'timestep_analysis.png'.
 
     Raises:
         ValueError: If the number of files and labels do not match.
@@ -111,5 +120,27 @@ def analyse_timestep_files(
     plt.tight_layout()
     plt.subplots_adjust(right=0.8)  # Make room for legends
 
-    # Show the plot
-    plt.show()
+    # Create the output path
+    path = None
+    if output_path is not None:
+        path = Path(output_path)
+    else:
+        path = Path.cwd()
+
+    # Ensure the output directory exists and is a directory
+    if not path.is_dir():
+        raise ValueError(f"Output path {path} is not a directory.")
+    path.mkdir(parents=True, exist_ok=True)
+
+    # Create the output filename
+    filename = f"{prefix + '_' if prefix else ''}timestep_analysis.png"
+    output_file = path / filename
+
+    # Save the figure if an output path is provided
+    plt.savefig(output_file, dpi=300, bbox_inches="tight")
+    print(f"Plot saved to {output_file}")
+
+    # Show the plot if requested
+    if show_plot:
+        plt.show()
+    plt.close()
