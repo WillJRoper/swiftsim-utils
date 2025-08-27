@@ -47,6 +47,10 @@ def analyse_timestep_files(
     y = [np.cumsum(d[:, wall_clock_index]) for d in data]
     deadtime = [np.cumsum(d[:, deadtime_index]) for d in data]
 
+    # Convert runtimes from ms to hrs
+    y /= 1000 * 60 * 60
+    deadtime /= 1000 * 60 * 60
+
     # Create the figure with two subplots
     fig, (ax1, ax2) = plt.subplots(
         2,
@@ -77,7 +81,7 @@ def analyse_timestep_files(
 
     # Set labels and title for main plot
     x_label = "Time [Internal Units]" if plot_time else "Scale factor"
-    ax1.set_ylabel("Wallclock Time [s]")
+    ax1.set_ylabel("Wallclock Time [hrs]")
     # Only show legend for wall clock lines (solid lines only)
     handles, legend_labels = ax1.get_legend_handles_labels()
     wall_clock_handles = [
