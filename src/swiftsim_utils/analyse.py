@@ -65,13 +65,12 @@ def analyse_timestep_files(
     for i, (xi, yi, dt, label, color) in enumerate(
         zip(x, y, deadtime, labels, colors)
     ):
-        # Plot wall clock time (solid lines)
+        # Plot wall clock time (solid lines) - remove label since we have custom legend
         ax1.plot(
             xi,
             yi,
             "-",
             color=color,
-            label=f"{label} (wall clock)",
             linewidth=2,
         )
         # Plot dead time (dashed lines with alpha) - make more visible
@@ -79,7 +78,7 @@ def analyse_timestep_files(
 
     # Set labels and title for main plot
     x_label = "Time [Internal Units]" if plot_time else "Scale factor"
-    ax1.set_ylabel("Wallclock Time [hrs]")
+    ax1.set_ylabel("Wallclock Time [s]")
     # Only show legend for wall clock lines (solid lines only)
     handles, legend_labels = ax1.get_legend_handles_labels()
     wall_clock_handles = [
