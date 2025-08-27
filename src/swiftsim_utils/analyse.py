@@ -42,14 +42,12 @@ def analyse_timestep_files(
     wall_clock_index = 12
     deadtime_index = -1
 
-    # Extract the x and y columns
+    # Extract the x and y columns and convert wall clock time to hours
     x = [d[:, time_index] for d in data]
-    y = [np.cumsum(d[:, wall_clock_index]) for d in data]
-    deadtime = [np.cumsum(d[:, deadtime_index]) for d in data]
-
-    # Convert runtimes from ms to hrs
-    y /= 1000 * 60 * 60
-    deadtime /= 1000 * 60 * 60
+    y = [np.cumsum(d[:, wall_clock_index]) / (1000 * 60 * 60) for d in data]
+    deadtime = [
+        np.cumsum(d[:, deadtime_index]) / (1000 * 60 * 60) for d in data
+    ]
 
     # Create the figure with two subplots
     fig, (ax1, ax2) = plt.subplots(
