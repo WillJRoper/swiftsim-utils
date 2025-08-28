@@ -104,7 +104,6 @@ def analyse_timestep_files(
         ),
     ]
     ax1.legend(handles=legend_elements, loc="best")
-    ax1.grid(True, alpha=0.3)
 
     # Deadtime percentage plot
     for i, (xi, yi, dt, label, color) in enumerate(
@@ -126,13 +125,11 @@ def analyse_timestep_files(
     # Set labels and formatting for deadtime percentage plot
     ax2.set_xlabel(x_label)
     ax2.set_ylabel("Dead Time [%]")
-    ax2.grid(True, alpha=0.3)
     ax2.legend(loc="best")
     ax2.set_ylim(0, None)  # Start y-axis at 0 for percentage
 
     # Adjust layout to prevent overlapping
     plt.tight_layout()
-    plt.subplots_adjust(right=0.8)  # Make room for legends
 
     # Create the output path
     path = None
