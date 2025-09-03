@@ -1,10 +1,76 @@
-"""A module containing tools for analysing SWIFT runs."""
+"""Analyse mode for analysing SWIFT runs."""
 
+import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.lines import Line2D
+
+
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add arguments for the 'analyse' mode."""
+    parser.add_argument(
+        "--timesteps",
+        "-t",
+        nargs="+",
+        required=False,
+        help="List of timestep files to analyse and produce a plot for.",
+        type=Path,
+        default=[],
+    )
+
+    parser.add_argument(
+        "--labels",
+        "-l",
+        nargs="+",
+        required=True,
+        help="List of labels for the runs being analysed.",
+        type=str,
+        default=[],
+    )
+
+    parser.add_argument(
+        "--plot-time",
+        action="store_true",
+        help="Plot against time (default is scale factor).",
+        default=False,
+    )
+
+    parser.add_argument(
+        "--output-path",
+        "-o",
+        type=Path,
+        help="Where to save analysis (default: current directory).",
+        default=None,
+    )
+
+    parser.add_argument(
+        "--prefix",
+        "-p",
+        type=str,
+        help="A prefix to add to the analysis files (default: '').",
+        default="",
+    )
+
+    parser.add_argument(
+        "--show",
+        action="store_true",
+        help="Show the plot interactively.",
+        default=False,
+    )
+
+
+def run(args: argparse.Namespace) -> None:
+    """Execute the analyse mode."""
+    analyse_timestep_files(
+        files=args.timesteps,
+        labels=args.labels,
+        plot_time=args.plot_time,
+        output_path=args.output_path,
+        prefix=args.prefix,
+        show_plot=args.show,
+    )
 
 
 def analyse_timestep_files(
@@ -31,6 +97,7 @@ def analyse_timestep_files(
     Raises:
         ValueError: If the number of files and labels do not match.
     """
+    print(prefix)
     # Make sure the number of files and labels match
     if len(files) != len(labels):
         raise ValueError("Number of files and labels must match.")

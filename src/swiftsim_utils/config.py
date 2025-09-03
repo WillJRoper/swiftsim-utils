@@ -1,6 +1,6 @@
 """A module containing tools for permenantly configuring SWIFT-utils."""
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
@@ -90,47 +90,6 @@ def get_cli_configuration(
         float(softening_coeff),
         float(softening_pivot_z),
     )
-
-
-def config_swift_utils() -> None:
-    """Configure SWIFT-utils by collecting user input."""
-    # Define the path to the config file
-    config_file = Path.home() / ".swiftsim-utils" / "config.yaml"
-
-    # Ensure the directory exists
-    config_file.parent.mkdir(parents=True, exist_ok=True)
-
-    # If the config file already exists, load it to use as defaults
-    if config_file.exists():
-        with open(config_file, "r") as f:
-            config_data = yaml.safe_load(f)
-        if config_data is None:  # Handle case where the file is empty
-            config_data = {}
-        default_swift = config_data.get("swiftsim_dir", None)
-        default_data = config_data.get("data_dir", None)
-    else:
-        default_swift = None
-        default_data = None
-
-    # Collect configuration interactively
-    config = get_cli_configuration(
-        default_swift=default_swift,
-        default_data=default_data,
-    )
-
-    # Convert the dataclass to a dictionary
-    data = asdict(config)
-
-    # Convert all Paths to strings for YAML serialization
-    for k, v in data.items():
-        if isinstance(v, Path):
-            data[k] = str(v)
-
-    # Write the configuration to the YAML file
-    with open(config_file, "w") as f:
-        yaml.dump(data, f, default_flow_style=False)
-
-    print("Configuration saved to", config_file)
 
 
 def _load_swift_config() -> SwiftCLIConfig:
