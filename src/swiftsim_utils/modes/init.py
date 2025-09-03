@@ -9,11 +9,11 @@ import yaml
 from swiftsim_utils.config import get_cli_configuration
 
 ascii_art = (
-    r"    ______       _________________        _______   __",
-    r"   / ___/ |     / /  _/ ___/_  __/ ____  / ___/ /  / /",
-    r"   \__ \| | /| / // // /_   / /   /___/ / /  / /  / /",
-    r"  ___/ /| |/ |/ // // __/  / /         / /__/ /__/ /",
-    r" /____/ |__/|__/___/_/    /_/         /____/____/_/",
+    r"    ______       _________________        _______   ____",
+    r"   / ___/ |     / /  _/ ___/_  __/ ____  / ___/ /  /  _/",
+    r"   \__ \| | /| / // // /_   / /   /___/ / /  / /  // /",
+    r"  ___/ /| |/ |/ // // __/  / /         / /__/ /__// /",
+    r" /____/ |__/|__/___/_/    /_/         /____/____/___/",
 )
 
 
@@ -34,7 +34,7 @@ def config_swift_utils() -> None:
     print("\nWelcome to SWIFTsim-CLI!\n")
     print("\n".join(ascii_art))
     print()
-    print("Let's set up your configuration.\n")
+    print("Let's set up your configuration...\n")
     print()
 
     # Define the path to the config file
@@ -68,6 +68,9 @@ def config_swift_utils() -> None:
     for k, v in data.items():
         if isinstance(v, Path):
             data[k] = str(v)
+
+    # Save the configuration under a name and also store it as the current
+    config = {"Current": data, "Default": data}
 
     # Write the configuration to the YAML file
     with open(config_file, "w") as f:
