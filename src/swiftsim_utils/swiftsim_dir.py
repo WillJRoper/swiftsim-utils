@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from swiftsim_utils.config import load_swift_config
+from swiftsim_utils.modes.config import load_swift_config
 from swiftsim_utils.utilities import run_command_in_dir
 
 
@@ -60,5 +60,3 @@ def _run_command_in_swift_dir(command: str, swift_dir: Path) -> None:
 
     # Run the command in the SWIFT directory
     run_command_in_dir(command, swift_dir)
-
-
