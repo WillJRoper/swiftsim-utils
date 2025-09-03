@@ -11,8 +11,8 @@ from swiftsim_utils.config import get_cli_configuration
 ascii_art = (
     r"    ______       _________________        _______   ____",
     r"   / ___/ |     / /  _/ ___/_  __/ ____  / ___/ /  /  _/",
-    r"   \__ \| | /| / // // /_   / /   /___/ / /  / /  // /",
-    r"  ___/ /| |/ |/ // // __/  / /         / /__/ /__// /",
+    r"   \__ \| | /| / // // /_   / /   /___/ / /  / /   / /",
+    r"  ___/ /| |/ |/ // // __/  / /         / /__/ /__ / /",
     r" /____/ |__/|__/___/_/    /_/         /____/____/___/",
 )
 
@@ -74,6 +74,6 @@ def config_swift_utils() -> None:
 
     # Write the configuration to the YAML file
     with open(config_file, "w") as f:
-        yaml.dump(data, f, default_flow_style=False)
+        yaml.dump(config, f, default_flow_style=False)
 
     print("Configuration saved to", config_file)
