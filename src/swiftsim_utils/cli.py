@@ -1,7 +1,7 @@
 """The main module containing the swiftsim-utils CLI tool."""
 
+from swiftsim_utils.config import load_swift_config
 from swiftsim_utils.modes import MODE_MODULES
-from swiftsim_utils.modes.config import load_swift_config
 from swiftsim_utils.multi_mode_args import MultiModeCLIArgs
 from swiftsim_utils.params import load_parameters
 
