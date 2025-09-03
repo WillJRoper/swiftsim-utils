@@ -1,6 +1,8 @@
-"""A module for generating output lists for defining SWIFT snapshot times."""
+"""Output-times mode for generating output time lists."""
 
+import argparse
 import numpy as np
+from pathlib import Path
 
 from swiftsim_utils.cosmology import (
     convert_redshift_to_scale_factor,
@@ -10,6 +12,138 @@ from swiftsim_utils.cosmology import (
     get_cosmology,
 )
 from swiftsim_utils.params import load_parameters
+
+
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add arguments for the 'output-times' mode."""
+    # We always need the output file
+    parser.add_argument(
+        "--out",
+        "-o",
+        default="output_list.txt",
+        help="Output file for the list of times.",
+    )
+
+    # We can optionally provide a parameter file, this will be used to
+    # get cosmology parameters and other settings.
+    parser.add_argument(
+        "-p",
+        "--params",
+        type=Path,
+        help="Path to a parameter file.",
+        default=None,
+    )
+
+    # We will always need one definition of the first snapshot but this can be
+    # defined in terms of redshift, time, or scale factor.
+    parser.add_argument(
+        "--first-snap-z",
+        "-fz",
+        type=float,
+        default=None,
+        help="Redshift of the first snapshot to include.",
+    )
+    parser.add_argument(
+        "--first-snap-time",
+        "-ft",
+        type=float,
+        default=None,
+        help="Time of the first snapshot in internal units.",
+    )
+    parser.add_argument(
+        "--first-snap-scale-factor",
+        "-fa",
+        type=float,
+        default=None,
+        help="Scale factor of the first snapshot to include.",
+    )
+
+    # Similarly with the delta between snapshots, we can define this in terms
+    # of redshift, time, scale factor, or logarithmic scale factor.
+    parser.add_argument(
+        "--delta-z",
+        "-dz",
+        type=float,
+        default=None,
+        help="Redshift interval between snapshots.",
+    )
+    parser.add_argument(
+        "--delta-time",
+        "-dt",
+        type=float,
+        default=None,
+        help="Time interval between snapshots in internal units.",
+    )
+    parser.add_argument(
+        "--delta-scale-factor",
+        "-da",
+        type=float,
+        default=None,
+        help="Scale factor interval between snapshots.",
+    )
+    parser.add_argument(
+        "--delta-log-scale-factor",
+        "-dla",
+        type=float,
+        default=None,
+        help="Logarithmic scale factor interval between snapshots.",
+    )
+
+    # If we want snipshots, in between we just define a smaller delta for these
+    # (again, in terms of redshift, time, scale factor, or
+    # logarithmic scale factor).
+    parser.add_argument(
+        "--snipshot-delta-z",
+        "-sdz",
+        type=float,
+        default=None,
+        help="Redshift interval between snipshots.",
+    )
+    parser.add_argument(
+        "--snipshot-delta-time",
+        "-sdt",
+        type=float,
+        default=None,
+        help="Time interval between snipshots in internal units.",
+    )
+    parser.add_argument(
+        "--snipshot-delta-scale-factor",
+        "-sda",
+        type=float,
+        default=None,
+        help="Scale factor interval between snipshots.",
+    )
+    parser.add_argument(
+        "--snipshot-delta-log-scale-factor",
+        "-sdla",
+        type=float,
+        default=None,
+        help="Logarithmic scale factor interval between snipshots.",
+    )
+
+    # We will also need to the final snapshot, for redshift and scale factor
+    # this has a well defined default, for time it does not.
+    parser.add_argument(
+        "--final-snap-z",
+        "-fzf",
+        type=float,
+        default=0.0,
+        help="Redshift of the final snapshot to include (default: 0.0).",
+    )
+    parser.add_argument(
+        "--final-snap-time",
+        "-ftf",
+        type=float,
+        default=None,
+        help="Time of the final snapshot in internal units (default: None).",
+    )
+    parser.add_argument(
+        "--final-snap-scale-factor",
+        "-faf",
+        type=float,
+        default=1.0,
+        help="Scale factor of the final snapshot to include (default: 1.0).",
+    )
 
 
 def _get_out_list_z(
@@ -789,3 +923,8 @@ def generate_output_list(args: dict) -> None:
         _generate_output_list_with_cosmo(args, cosmo)
     else:
         _generate_output_list_no_cosmo(args)
+
+
+def run(args: argparse.Namespace) -> None:
+    """Execute the output-times mode."""
+    generate_output_list(vars(args))

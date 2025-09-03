@@ -1,6 +1,7 @@
 """A module containing tools for permenantly configuring SWIFT-utils."""
 
-from dataclasses import asdict, dataclass
+import argparse
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
@@ -8,6 +9,78 @@ import yaml
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.validation import ValidationError, Validator
+
+from swiftsim_utils.swiftsim_dir import (
+    _run_command_in_swift_dir,
+    get_swiftsim_dir,
+)
+
+
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add arguments for configuring SWIFT itself."""
+    # Show the configuration options (equivalent to running
+    # `./configure --help`).
+    parser.add_argument(
+        "--show",
+        "-s",
+        action="store_true",
+        help="Show the available configuration options.",
+    )
+
+
+def run(args: argparse.Namespace) -> None:
+    """Execute the config mode."""
+    # Are we just showing the config options?
+    if args.show:
+        show_config_options(args.swift_dir)
+    else:
+        config_swiftsim(
+            opts=" ".join(args.options),
+            swift_dir=args.swift_dir,
+        )
+
+
+def config_swiftsim(opts: str, swift_dir: Path | None = None) -> None:
+    """Configure SWIFT itself.
+
+    This will navigate to the SWIFT directory (erroring if there is not one
+    set) and then run the SWIFT configuration script with the provided options.
+
+    Args:
+        opts: The options to pass to the SWIFT configuration script.
+        swift_dir: Optional path to the SWIFT directory. If None, uses the
+            directory from the SWIFT-utils config.
+
+    Raises:
+        FileNotFoundError: If the SWIFT directory does not exist.
+        ValueError: If the SWIFT directory is not set in the configuration.
+    """
+    # Get the SWIFT directory
+    swift_dir = get_swiftsim_dir(swift_dir)
+
+    # Run the command in the SWIFT directory
+    _run_command_in_swift_dir(f"./configure {opts}", swift_dir)
+
+
+def show_config_options(swift_dir: Path | None = None) -> None:
+    """Show the configuration options for SWIFT.
+
+    This will navigate to the SWIFT directory (erroring if there is not one
+    set) and then run the SWIFT configuration script with the --help option.
+
+    Args:
+        swift_dir: Optional path to the SWIFT directory. If None, uses the
+            directory from the SWIFT-utils config.
+
+    Raises:
+        FileNotFoundError: If the SWIFT directory does not exist.
+        ValueError: If the SWIFT directory is not set in the configuration.
+    """
+    # Get the SWIFT directory
+    swift_dir = get_swiftsim_dir(swift_dir)
+
+    # Run the command in the SWIFT directory
+    _run_command_in_swift_dir("./configure --help", swift_dir)
 
 
 @dataclass()
@@ -90,47 +163,6 @@ def get_cli_configuration(
         float(softening_coeff),
         float(softening_pivot_z),
     )
-
-
-def config_swift_utils() -> None:
-    """Configure SWIFT-utils by collecting user input."""
-    # Define the path to the config file
-    config_file = Path.home() / ".swiftsim-utils" / "config.yaml"
-
-    # Ensure the directory exists
-    config_file.parent.mkdir(parents=True, exist_ok=True)
-
-    # If the config file already exists, load it to use as defaults
-    if config_file.exists():
-        with open(config_file, "r") as f:
-            config_data = yaml.safe_load(f)
-        if config_data is None:  # Handle case where the file is empty
-            config_data = {}
-        default_swift = config_data.get("swiftsim_dir", None)
-        default_data = config_data.get("data_dir", None)
-    else:
-        default_swift = None
-        default_data = None
-
-    # Collect configuration interactively
-    config = get_cli_configuration(
-        default_swift=default_swift,
-        default_data=default_data,
-    )
-
-    # Convert the dataclass to a dictionary
-    data = asdict(config)
-
-    # Convert all Paths to strings for YAML serialization
-    for k, v in data.items():
-        if isinstance(v, Path):
-            data[k] = str(v)
-
-    # Write the configuration to the YAML file
-    with open(config_file, "w") as f:
-        yaml.dump(data, f, default_flow_style=False)
-
-    print("Configuration saved to", config_file)
 
 
 def _load_swift_config() -> SwiftCLIConfig:

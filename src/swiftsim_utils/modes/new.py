@@ -1,7 +1,9 @@
-"""A module containing the machinery for creating a new SWIFT run."""
+"""New mode for creating new SWIFT run directories."""
 
+import argparse
 import warnings
 from pathlib import Path
+from typing import Tuple
 
 import h5py
 from ruamel.yaml import YAML
@@ -15,6 +17,59 @@ yaml.default_flow_style = False
 yaml.indent(mapping=4, sequence=4, offset=2)
 yaml.width = 80
 yaml.allow_unicode = True
+
+
+def _kv_pair(arg: str) -> Tuple[str, str]:
+    """Parse a KEY=VALUE pair from a string.
+
+    Argparse "type" function: split a KEY=VALUE into a (key, value) tuple,
+    or raise an error if the syntax is wrong.
+    """
+    if "=" not in arg:
+        raise argparse.ArgumentTypeError(
+            f"invalid parameter override '{arg}'; expected KEY=VALUE"
+        )
+    key, val = arg.split("=", 1)
+    return key, val
+
+
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add arguments for the 'new' mode."""
+    parser.add_argument(
+        "--path",
+        required=True,
+        help="Path to the new SWIFT run.",
+        type=Path,
+    )
+    parser.add_argument(
+        "--inic",
+        required=True,
+        help="Path to the initial conditions HDF5 file.",
+        type=Path,
+    )
+
+    # Add the ability to override internal parameters
+    parser.add_argument(
+        "--param",
+        metavar="KEY=VALUE",
+        type=_kv_pair,
+        action="append",
+        help=(
+            "Override a SWIFT parameter in the form ROOTKEY:KEY=VALUE.  "
+            "Can be repeated for multiple overrides."
+        ),
+        default=[],
+    )
+
+
+def run(args: argparse.Namespace) -> None:
+    """Execute the new mode."""
+    make_new_run_dir(
+        output_dir=args.path,
+        inicond_file=args.inic,
+        swift_dir=args.swift_dir,
+        overide_params=dict(args.param),
+    )
 
 
 def derive_params_from_ics(
