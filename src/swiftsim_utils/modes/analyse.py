@@ -97,7 +97,6 @@ def analyse_timestep_files(
     Raises:
         ValueError: If the number of files and labels do not match.
     """
-    print(prefix)
     # Make sure the number of files and labels match
     if len(files) != len(labels):
         raise ValueError("Number of files and labels must match.")
