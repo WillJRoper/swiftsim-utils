@@ -5,8 +5,8 @@ import sys
 from pathlib import Path
 from typing import List, Sequence, Tuple
 
+from swiftsim_utils.config import load_swift_config
 from swiftsim_utils.modes import AVAILABLE_MODES, MODE_MODULES, Mode
-from swiftsim_utils.modes.config import load_swift_config
 
 
 class MultiModeCLIArgs:
