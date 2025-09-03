@@ -5,7 +5,8 @@ from dataclasses import asdict
 from pathlib import Path
 
 import yaml
-from swiftsim_utils.config import get_cli_configuration
+
+from swiftsim_utils.modes.config import get_cli_configuration
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
