@@ -7,14 +7,7 @@ from pathlib import Path
 import yaml
 
 from swiftsim_utils.config import get_cli_configuration
-
-ascii_art = (
-    r"    ______       _________________        _______   ____",
-    r"   / ___/ |     / /  _/ ___/_  __/ ____  / ___/ /  /  _/",
-    r"   \__ \| | /| / // // /_   / /   /___/ / /  / /   / /",
-    r"  ___/ /| |/ |/ // // __/  / /         / /__/ /__ / /",
-    r" /____/ |__/|__/___/_/    /_/         /____/____/___/",
-)
+from swiftsim_utils.utilities import ascii_art
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
