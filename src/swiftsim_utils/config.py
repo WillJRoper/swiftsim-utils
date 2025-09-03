@@ -21,6 +21,7 @@ class SwiftCLIConfig:
 
     swiftsim_dir: Path
     data_dir: Path
+    branch: str = "master"
     softening_coeff: float = 0.04
     softening_pivot_z: float = 2.7
 
@@ -67,6 +68,11 @@ def get_cli_configuration(
         validator=PathExistsValidator(),
     ).strip()
 
+    swift_branch = prompt(
+        "SWIFTSim branch: ",
+        default="master",
+    ).strip()
+
     # Get the softening coefficient and pivot redshift, with a default values
     softening_coeff = prompt(
         "Softening coefficient in epsilon"
@@ -87,12 +93,14 @@ def get_cli_configuration(
     return SwiftCLIConfig(
         Path(swift_repo).expanduser(),
         Path(data_dir).expanduser(),
+        swift_branch,
         float(softening_coeff),
         float(softening_pivot_z),
     )
 
 
-def _load_swift_config() -> SwiftCLIConfig:
+@lru_cache(maxsize=None)
+def _load_swift_config(key=None) -> SwiftCLIConfig:
     """Load the SWIFT-utils configuration from the config file.
 
     Returns:
@@ -112,6 +120,12 @@ def _load_swift_config() -> SwiftCLIConfig:
     if config_data is None:
         return SwiftCLIConfig(None, None, 0.04, 2.7)
 
+    # If key is None return the current config
+    if key is None:
+        config_data = config_data["Current"]
+    else:
+        config_data = config_data.get(key, {})
+
     return SwiftCLIConfig(
         Path(config_data["swiftsim_dir"]),
         Path(config_data["data_dir"]),
@@ -120,7 +134,6 @@ def _load_swift_config() -> SwiftCLIConfig:
     )
 
 
-@lru_cache(maxsize=1)
 def load_swift_config() -> SwiftCLIConfig:
     """Load the SWIFT-utils configuration.
 
