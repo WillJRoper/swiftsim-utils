@@ -8,6 +8,14 @@ import yaml
 
 from swiftsim_utils.modes.config import get_cli_configuration
 
+ascii_art = (
+    "    ______       _________________        _____  __     __\n",
+    "   / ___/ |     / /  _/ ___/_  __/ ____  / ___/ / /    / /\n",
+    "   \\__ \\| | /| / // // /_   / / /___/ / /    / /    / /\n",
+    "  ___/ /| |/ |/ // // __/  / /         / /__  / /__  / /\n",
+    " /____/ |__/|__/___/_/    /_/         /____/ /____/ /_/\n",
+)
+
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Add arguments for the 'init' mode."""
@@ -22,6 +30,12 @@ def run(args: argparse.Namespace) -> None:
 
 def config_swift_utils() -> None:
     """Configure SWIFT-utils by collecting user input."""
+    # Print the ASCII art
+    print("\nWelcome to SWIFTsim-CLI!\n")
+    print("".join(ascii_art))
+    print("Let's set up your configuration.\n")
+    print()
+
     # Define the path to the config file
     config_file = Path.home() / ".swiftsim-utils" / "config.yaml"
 
