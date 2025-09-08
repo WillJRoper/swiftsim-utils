@@ -1,6 +1,6 @@
 """A module containing tools for permenantly configuring SWIFT-utils."""
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from functools import lru_cache
 from pathlib import Path
 
@@ -129,9 +129,32 @@ def _load_swift_config(key=None) -> SwiftCLIConfig:
     return SwiftCLIConfig(
         Path(config_data["swiftsim_dir"]),
         Path(config_data["data_dir"]),
+        config_data.get("branch", "master"),
         float(config_data.get("softening_coeff", 0.04)),
         float(config_data.get("softening_pivot_z", 2.7)),
     )
+
+
+def _load_all_profiles() -> dict[str, dict]:
+    """Load all profiles from the SWIFT-utils configuration file.
+
+    Returns:
+        dict[str, dict]: A dictionary of all profiles in the configuration
+            file.
+    """
+    # Define the path to the config file
+    config_file = Path.home() / ".swiftsim-utils" / "config.yaml"
+
+    # Load existing config handling edge cases
+    if config_file.exists():
+        with open(config_file, "r") as f:
+            all_config_data = yaml.safe_load(f)
+        if all_config_data is None:  # Handle case where the file is empty
+            all_config_data = {}
+    else:
+        all_config_data = {}
+
+    return all_config_data
 
 
 def load_swift_config() -> SwiftCLIConfig:
@@ -144,3 +167,54 @@ def load_swift_config() -> SwiftCLIConfig:
         SwiftCLIConfig: The loaded configuration.
     """
     return _load_swift_config()
+
+
+def _save_swift_config(config: SwiftCLIConfig, key: str = "Current") -> None:
+    """Save the SWIFT-utils configuration to the config file.
+
+    Args:
+        config: The configuration to save.
+        key: The key under which to save the configuration. Defaults to
+             "Current".
+    """
+    # Define the path to the config file
+    config_file = Path.home() / ".swiftsim-utils" / "config.yaml"
+
+    # Ensure the directory exists
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Load existing config
+    all_config_data = _load_all_profiles()
+
+    # Set the contents under the given key
+    all_config_data[key] = asdict(config)
+
+    # Convert all Paths to strings for YAML serialization
+    for k, v in all_config_data.items():
+        for _k, _v in v.items():
+            if isinstance(_v, Path):
+                all_config_data[k][_k] = str(_v)
+
+    # Write back to the config file
+    with open(config_file, "w") as f:
+        yaml.safe_dump(all_config_data, f)
+
+    # Clear the cached config
+    _load_swift_config.cache_clear()
+
+
+def update_current_config_value(key: str, value: str | float | int) -> None:
+    """Update a single value in the current configuration.
+
+    Args:
+        key: The key to update.
+        value: The new value.
+    """
+    # Get the current config
+    config = load_swift_config()
+
+    # Update the value
+    setattr(config, key, value)
+
+    # Save the updated config
+    _save_swift_config(config, "Current")

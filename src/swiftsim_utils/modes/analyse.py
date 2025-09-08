@@ -50,7 +50,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "-p",
         type=str,
         help="A prefix to add to the analysis files (default: '').",
-        default="",
+        default=None,
     )
 
     parser.add_argument(
