@@ -102,20 +102,43 @@ def analyse_timestep_files(
     if len(files) != len(labels):
         raise ValueError("Number of files and labels must match.")
 
-    # Load the data from the files
-    data = [np.loadtxt(f, skiprows=13) for f in files]
-
     # Are we plotting against time or scale factor?
     time_index = 1 if plot_time else 2
     wall_clock_index = 12
     deadtime_index = -1
 
-    # Extract the x and y columns and convert wall clock time to hours
-    x = [d[:, time_index] for d in data]
-    y = [np.cumsum(d[:, wall_clock_index]) / (1000 * 60 * 60) for d in data]
-    deadtime = [
-        np.cumsum(d[:, deadtime_index]) / (1000 * 60 * 60) for d in data
-    ]
+    # Loop over the lines in the file and extract the relevant data
+    x = []
+    y = []
+    deadtime = []
+    for file in files:
+        xi, yi, dti = [], [], []
+        with open(file, "r") as f:
+            for line in f:
+                # Ensure we aren't reading a comment line
+                if line.startswith("#"):
+                    continue
+
+                # If the line doesn't start with an empty space, its not a
+                # data line
+                if not line[0].isspace():
+                    continue
+
+                # Split the line into parts
+                parts = line.split()
+
+                # Ensure we found 15 columns
+                if len(parts) != 15:
+                    continue
+
+                xi.append(float(parts[time_index]))
+                yi.append(float(parts[wall_clock_index]))
+                dti.append(float(parts[deadtime_index]))
+
+        # Convert to numpy arrays and compute cumulative sums in hours
+        x.append(np.array(xi))
+        y.append(np.cumsum(np.array(yi)) / (1000 * 60 * 60))
+        deadtime.append(np.cumsum(np.array(dti)) / (1000 * 60 * 60))
 
     # Create the figure with two subplots
     fig, (ax1, ax2) = plt.subplots(
