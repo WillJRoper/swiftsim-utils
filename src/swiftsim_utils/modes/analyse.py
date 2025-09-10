@@ -131,6 +131,19 @@ def analyse_timestep_files(
                 if len(parts) != 15:
                     continue
 
+                # Ensure all 15 columns are numbers
+                try:
+                    [float(part) for part in parts]
+                except ValueError:
+                    print(
+                        "Failed to parse line:",
+                        line,
+                        "in file:",
+                        file,
+                        "(this is probably fine)",
+                    )
+                    continue
+
                 xi.append(float(parts[time_index]))
                 yi.append(float(parts[wall_clock_index]))
                 dti.append(float(parts[deadtime_index]))
