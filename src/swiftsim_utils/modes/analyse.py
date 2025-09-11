@@ -549,6 +549,7 @@ def analyse_force_checks(
         error_pot = abs(diff_pot) / abs(exact_pot_corrected)
 
         # Bin the errors
+        print(norm_error)
         norm_error_hist, _ = np.histogram(
             norm_error, bins=bin_edges, density=False
         ) / (np.size(norm_error) * bin_size)
