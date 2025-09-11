@@ -1,6 +1,8 @@
 """Analyse mode for analysing SWIFT runs."""
 
 import argparse
+import glob
+import re
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -134,6 +136,61 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         type=int,
         help="Number of bins for histogram (default: 64).",
         default=64,
+    )
+
+    # Gravity error map subparser
+    error_map_parser = subparsers.add_parser(
+        "gravity-error-map",
+        help="Create hexbin error maps for gravity check files",
+    )
+
+    error_map_parser.add_argument(
+        "files",
+        nargs="+",
+        help="List of gravity check files to analyse (either exact or"
+        " SWIFT files).",
+        type=Path,
+    )
+
+    error_map_parser.add_argument(
+        "--labels",
+        "-l",
+        nargs="+",
+        required=True,
+        help="List of labels for the runs being analysed.",
+        type=str,
+    )
+
+    error_map_parser.add_argument(
+        "--output-path",
+        "-o",
+        type=Path,
+        help="Where to save analysis (default: current directory).",
+        default=None,
+    )
+
+    error_map_parser.add_argument(
+        "--prefix",
+        "-p",
+        type=str,
+        help="A prefix to add to the analysis files (default: '').",
+        default="",
+    )
+
+    error_map_parser.add_argument(
+        "--show",
+        action="store_true",
+        help="Show the plot interactively.",
+        default=False,
+    )
+
+    error_map_parser.add_argument(
+        "--resolution",
+        "--gridsize",
+        "-r",
+        type=int,
+        help="Resolution (gridsize) for hexbin plot (default: 100).",
+        default=100,
     )
 
 
@@ -349,6 +406,65 @@ def analyse_timestep_files(
     plt.close()
 
 
+def _find_counterpart_file(filepath: str) -> tuple[str, str]:
+    """Find the counterpart file (exact <-> swift) for a given file."""
+    file_path = Path(filepath)
+    filename = file_path.name
+    directory = file_path.parent
+
+    # Check if this is an exact file
+    if "exact" in filename:
+        # This is an exact file, find the corresponding SWIFT file
+        exact_file = filepath
+
+        # Extract step number
+        step_match = re.search(r"step(\d{4})", filename)
+        if not step_match:
+            raise ValueError(f"Could not extract step number from {filename}")
+        step_num = step_match.group(1)
+
+        # Look for corresponding SWIFT files with different orders
+        swift_pattern = (
+            directory / f"gravity_checks_swift_step{step_num}_order*.dat"
+        )
+        swift_files = list(glob.glob(str(swift_pattern)))
+
+        if not swift_files:
+            raise FileNotFoundError(
+                f"No SWIFT files found for step {step_num}"
+            )
+
+        # Take the first one found
+        swift_file = swift_files[0]
+
+    else:
+        # This should be a SWIFT file, find the corresponding exact file
+        swift_file = filepath
+
+        # Extract step number
+        step_match = re.search(r"step(\d{4})", filename)
+        if not step_match:
+            raise ValueError(f"Could not extract step number from {filename}")
+        step_num = step_match.group(1)
+
+        # Look for exact file - try different patterns
+        exact_patterns = [
+            directory / f"gravity_checks_exact_step{step_num}.dat",
+            directory / f"gravity_checks_exact_periodic_step{step_num}.dat",
+        ]
+
+        exact_file = None
+        for pattern in exact_patterns:
+            if pattern.exists():
+                exact_file = str(pattern)
+                break
+
+        if exact_file is None:
+            raise FileNotFoundError(f"No exact file found for step {step_num}")
+
+    return exact_file, swift_file
+
+
 def analyse_force_checks(
     files: list[str],
     labels: list[str],
@@ -378,10 +494,6 @@ def analyse_force_checks(
         ValueError: If the number of files and labels do not match.
         FileNotFoundError: If counterpart files cannot be found.
     """
-    import glob
-    import re
-    from pathlib import Path
-
     # Make sure the number of files and labels match
     if len(files) != len(labels):
         raise ValueError("Number of files and labels must match.")
@@ -427,75 +539,10 @@ def analyse_force_checks(
     ax4 = plt.subplot(234)
     ax5 = plt.subplot(235)
 
-    def find_counterpart_file(filepath: str) -> tuple[str, str]:
-        """Find the counterpart file (exact <-> swift) for a given file."""
-        file_path = Path(filepath)
-        filename = file_path.name
-        directory = file_path.parent
-
-        # Check if this is an exact file
-        if "exact" in filename:
-            # This is an exact file, find the corresponding SWIFT file
-            exact_file = filepath
-
-            # Extract step number
-            step_match = re.search(r"step(\d{4})", filename)
-            if not step_match:
-                raise ValueError(
-                    f"Could not extract step number from {filename}"
-                )
-            step_num = step_match.group(1)
-
-            # Look for corresponding SWIFT files with different orders
-            swift_pattern = (
-                directory / f"gravity_checks_swift_step{step_num}_order*.dat"
-            )
-            swift_files = list(glob.glob(str(swift_pattern)))
-
-            if not swift_files:
-                raise FileNotFoundError(
-                    f"No SWIFT files found for step {step_num}"
-                )
-
-            # Take the first one found
-            swift_file = swift_files[0]
-
-        else:
-            # This should be a SWIFT file, find the corresponding exact file
-            swift_file = filepath
-
-            # Extract step number
-            step_match = re.search(r"step(\d{4})", filename)
-            if not step_match:
-                raise ValueError(
-                    f"Could not extract step number from {filename}"
-                )
-            step_num = step_match.group(1)
-
-            # Look for exact file - try different patterns
-            exact_patterns = [
-                directory / f"gravity_checks_exact_step{step_num}.dat",
-                directory
-                / f"gravity_checks_exact_periodic_step{step_num}.dat",
-            ]
-
-            exact_file = None
-            for pattern in exact_patterns:
-                if pattern.exists():
-                    exact_file = str(pattern)
-                    break
-
-            if exact_file is None:
-                raise FileNotFoundError(
-                    f"No exact file found for step {step_num}"
-                )
-
-        return exact_file, swift_file
-
     # Process each file and find its counterpart
     for i, (input_file, label) in enumerate(zip(files, labels)):
         try:
-            exact_file, swift_file = find_counterpart_file(input_file)
+            exact_file, swift_file = _find_counterpart_file(input_file)
         except (ValueError, FileNotFoundError) as e:
             print(f"Error processing {input_file}: {e}")
             continue
@@ -543,10 +590,10 @@ def analyse_force_checks(
             diff[:, 0] ** 2 + diff[:, 1] ** 2 + diff[:, 2] ** 2
         )
         norm_error = norm_diff / exact_a_norm
-        error_x = abs(diff[:, 0]) / exact_a_norm
-        error_y = abs(diff[:, 1]) / exact_a_norm
-        error_z = abs(diff[:, 2]) / exact_a_norm
-        error_pot = abs(diff_pot) / abs(exact_pot_corrected)
+        error_x = np.abs(diff[:, 0]) / exact_a_norm
+        error_y = np.abs(diff[:, 1]) / exact_a_norm
+        error_z = np.abs(diff[:, 2]) / exact_a_norm
+        error_pot = np.abs(diff_pot) / np.abs(exact_pot_corrected)
 
         # Bin the errors
         norm_error_hist, _ = np.histogram(
@@ -665,14 +712,183 @@ def analyse_force_checks(
     ax5.set_xlim(min_error, max_error)
     ax5.set_ylim(0, 1.75)
 
-    # Create the output path
-    output_file = create_output_path(output_path, prefix, "gravity_checks.png")
-
     # Save the figure
-    fig.savefig(output_file, dpi=200, bbox_inches="tight")
-    print(f"Plot saved to {output_file}")
+    png_file = create_output_path(output_path, prefix, "gravity_checks.png")
+
+    fig.savefig(png_file, dpi=200, bbox_inches="tight")
+    print(f"Plot saved to {png_file}")
 
     # Show the plot if requested
     if show_plot:
         plt.show()
-    plt.close()
+    plt.close(fig)
+
+
+def analyse_gravity_error_maps(
+    files: list[str],
+    labels: list[str],
+    output_path: str | None = None,
+    prefix: str = None,
+    show_plot: bool = True,
+    resolution: int = 100,
+) -> None:
+    """Create hexbin error maps for gravity check files.
+
+    Args:
+        files: List of file paths to either exact or SWIFT force files.
+               The function will automatically find the counterpart files.
+        labels: List of labels for the runs.
+        output_path: Optional path to save the plot. If None, the plot is saved
+            to the current directory.
+        prefix: Optional prefix to add to the output filename if saving.
+            If empty, defaults to 'gravity_error_map.png'.
+        show_plot: Whether to display the plot.
+        resolution: Resolution (gridsize) for hexbin plot (default: 100).
+
+    Raises:
+        ValueError: If the number of files and labels do not match.
+        FileNotFoundError: If counterpart files cannot be found.
+    """
+    # Make sure the number of files and labels match
+    if len(files) != len(labels):
+        raise ValueError("Number of files and labels must match.")
+
+    # Process each file and create individual error maps
+    for i, (input_file, label) in enumerate(zip(files, labels)):
+        try:
+            exact_file, swift_file = _find_counterpart_file(input_file)
+        except (ValueError, FileNotFoundError) as e:
+            print(f"Error processing {input_file}: {e}")
+            continue
+
+        # Read exact data
+        exact_data = np.loadtxt(exact_file)
+        exact_ids = exact_data[:, 0]
+        exact_pos = exact_data[:, 1:4]
+        exact_a = exact_data[:, 4:7]
+
+        # Sort exact data
+        sort_index = np.argsort(exact_ids)
+        exact_ids = exact_ids[sort_index]
+        exact_pos = exact_pos[sort_index, :]
+        exact_a = exact_a[sort_index, :]
+        exact_a_norm = np.sqrt(
+            exact_a[:, 0] ** 2 + exact_a[:, 1] ** 2 + exact_a[:, 2] ** 2
+        )
+
+        # Read SWIFT data
+        swift_data = np.loadtxt(swift_file)
+        swift_ids = swift_data[:, 0]
+        swift_pos = swift_data[:, 1:4]
+        swift_a_grav = swift_data[:, 4:7]  # a_swift columns
+
+        # Sort SWIFT data
+        sort_index = np.argsort(swift_ids)
+        swift_ids = swift_ids[sort_index]
+        swift_pos = swift_pos[sort_index, :]
+        swift_a_grav = swift_a_grav[sort_index, :]
+
+        # Compute errors
+        diff = exact_a - swift_a_grav
+        norm_diff = np.sqrt(
+            diff[:, 0] ** 2 + diff[:, 1] ** 2 + diff[:, 2] ** 2
+        )
+        norm_error = norm_diff / exact_a_norm
+
+        # Create individual error map for this file
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 10))
+        fig.suptitle(f"Gravity Error Maps - {label}", fontsize=16)
+
+        # X-Y projection
+        hb1 = ax1.hexbin(
+            exact_pos[:, 0],
+            exact_pos[:, 1],
+            C=norm_error,
+            gridsize=resolution,
+            cmap="viridis",
+            norm=plt.LogNorm(vmin=1e-7, vmax=1e-1),
+        )
+        ax1.set_xlabel("X Position")
+        ax1.set_ylabel("Y Position")
+        ax1.set_title("X-Y Projection")
+        ax1.set_aspect("equal")
+        cb1 = plt.colorbar(hb1, ax=ax1)
+        cb1.set_label("|δa|/|a_exact|")
+
+        # X-Z projection
+        hb2 = ax2.hexbin(
+            exact_pos[:, 0],
+            exact_pos[:, 2],
+            C=norm_error,
+            gridsize=resolution,
+            cmap="viridis",
+            norm=plt.LogNorm(vmin=1e-7, vmax=1e-1),
+        )
+        ax2.set_xlabel("X Position")
+        ax2.set_ylabel("Z Position")
+        ax2.set_title("X-Z Projection")
+        ax2.set_aspect("equal")
+        cb2 = plt.colorbar(hb2, ax=ax2)
+        cb2.set_label("|δa|/|a_exact|")
+
+        # Y-Z projection
+        hb3 = ax3.hexbin(
+            exact_pos[:, 1],
+            exact_pos[:, 2],
+            C=norm_error,
+            gridsize=resolution,
+            cmap="viridis",
+            norm=plt.LogNorm(vmin=1e-7, vmax=1e-1),
+        )
+        ax3.set_xlabel("Y Position")
+        ax3.set_ylabel("Z Position")
+        ax3.set_title("Y-Z Projection")
+        ax3.set_aspect("equal")
+        cb3 = plt.colorbar(hb3, ax=ax3)
+        cb3.set_label("|δa|/|a_exact|")
+
+        # Error vs distance from center
+        # Assuming box center at [0.5, 0.5, 0.5]
+        center = np.array([0.5, 0.5, 0.5])
+        distance_from_center = np.sqrt(
+            np.sum((exact_pos - center) ** 2, axis=1)
+        )
+
+        hb4 = ax4.hexbin(
+            distance_from_center,
+            norm_error,
+            gridsize=resolution,
+            cmap="viridis",
+            norm=plt.LogNorm(vmin=1e-7, vmax=1e-1),
+        )
+        ax4.set_xlabel("Distance from Center")
+        ax4.set_ylabel("|δa|/|a_exact|")
+        ax4.set_title("Error vs Distance from Center")
+        ax4.set_yscale("log")
+        cb4 = plt.colorbar(hb4, ax=ax4)
+        cb4.set_label("Particle Density")
+
+        plt.tight_layout()
+
+        # Save the figure
+        safe_label = label.replace(" ", "_").replace("/", "_")
+        png_file = create_output_path(
+            output_path, prefix, f"gravity_error_map_{safe_label}.png"
+        )
+
+        fig.savefig(png_file, dpi=200, bbox_inches="tight")
+        print(f"Error map saved to {png_file}")
+
+        # Show the plot if requested
+        if show_plot:
+            plt.show()
+        plt.close()
+
+        print(f"Processed error map for: {label}")
+        print(f"  Exact file: {exact_file}")
+        print(f"  SWIFT file: {swift_file}")
+        print(
+            f"  Error range: {np.min(norm_error):.2e} to"
+            f" {np.max(norm_error):.2e}"
+        )
+        print()
