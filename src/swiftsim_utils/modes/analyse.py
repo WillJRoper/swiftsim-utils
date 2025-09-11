@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.lines import Line2D
 
+from swiftsim_utils.utilities import create_output_path
+
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Add arguments for the 'analyse' mode with subparsers."""
@@ -333,20 +335,9 @@ def analyse_timestep_files(
     plt.tight_layout()
 
     # Create the output path
-    path = None
-    if output_path is not None:
-        path = Path(output_path)
-    else:
-        path = Path.cwd()
-
-    # Ensure the output directory exists and is a directory
-    if not path.is_dir():
-        raise ValueError(f"Output path {path} is not a directory.")
-    path.mkdir(parents=True, exist_ok=True)
-
-    # Create the output filename
-    filename = f"{prefix + '_' if prefix else ''}timestep_analysis.png"
-    output_file = path / filename
+    output_file = create_output_path(
+        output_path, prefix, "timestep_analysis.png"
+    )
 
     # Save the figure if an output path is provided
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
@@ -672,20 +663,7 @@ def analyse_force_checks(
     ax5.set_ylim(0, 1.75)
 
     # Create the output path
-    path = None
-    if output_path is not None:
-        path = Path(output_path)
-    else:
-        path = Path.cwd()
-
-    # Ensure the output directory exists and is a directory
-    if not path.is_dir():
-        raise ValueError(f"Output path {path} is not a directory.")
-    path.mkdir(parents=True, exist_ok=True)
-
-    # Create the output filename
-    filename = f"{prefix + '_' if prefix else ''}gravity_checks.png"
-    output_file = path / filename
+    output_file = create_output_path(output_path, prefix, "gravity_checks.png")
 
     # Save the figure
     fig.savefig(output_file, dpi=200, bbox_inches="tight")
