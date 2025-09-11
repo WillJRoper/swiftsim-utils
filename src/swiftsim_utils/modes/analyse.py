@@ -136,9 +136,9 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def run_timestep(args: argparse.Namespace) -> None:
-    """Execute the analyse mode."""
+    """Execute the timestep analysis."""
     analyse_timestep_files(
-        files=args.timesteps,
+        files=args.files,
         labels=args.labels,
         plot_time=args.plot_time,
         output_path=args.output_path,
