@@ -549,26 +549,24 @@ def analyse_force_checks(
         error_pot = abs(diff_pot) / abs(exact_pot_corrected)
 
         # Bin the errors
-        print(np.array(norm_error).shape)
-        print(bin_edges)
-        print(bin_size)
-        print(np.size(norm_error))
-        print(np.size(norm_error) * bin_size)
         norm_error_hist, _ = np.histogram(
             norm_error, bins=bin_edges, density=False
-        ) / (np.size(norm_error) * bin_size)
-        error_x_hist, _ = np.histogram(
-            error_x, bins=bin_edges, density=False
-        ) / (np.size(norm_error) * bin_size)
-        error_y_hist, _ = np.histogram(
-            error_y, bins=bin_edges, density=False
-        ) / (np.size(norm_error) * bin_size)
-        error_z_hist, _ = np.histogram(
-            error_z, bins=bin_edges, density=False
-        ) / (np.size(norm_error) * bin_size)
+        )
+        norm_error_hist = norm_error_hist / (np.size(norm_error) * bin_size)
+
+        error_x_hist, _ = np.histogram(error_x, bins=bin_edges, density=False)
+        error_x_hist = error_x_hist / (np.size(norm_error) * bin_size)
+
+        error_y_hist, _ = np.histogram(error_y, bins=bin_edges, density=False)
+        error_y_hist = error_y_hist / (np.size(norm_error) * bin_size)
+
+        error_z_hist, _ = np.histogram(error_z, bins=bin_edges, density=False)
+        error_z_hist = error_z_hist / (np.size(norm_error) * bin_size)
+
         error_pot_hist, _ = np.histogram(
             error_pot, bins=bin_edges, density=False
-        ) / (np.size(norm_error) * bin_size)
+        )
+        error_pot_hist = error_pot_hist / (np.size(norm_error) * bin_size)
 
         # Calculate statistics
         norm_median = np.median(norm_error)
