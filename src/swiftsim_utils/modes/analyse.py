@@ -220,12 +220,26 @@ def run_gravity_checks(args: argparse.Namespace) -> None:
     )
 
 
+def run_gravity_error_maps(args: argparse.Namespace) -> None:
+    """Execute the gravity error map analysis."""
+    analyse_gravity_error_maps(
+        files=args.files,
+        labels=args.labels,
+        output_path=args.output_path,
+        prefix=args.prefix,
+        show_plot=args.show,
+        resolution=args.resolution,
+    )
+
+
 def run(args: argparse.Namespace) -> None:
     """Execute the analyse mode based on the selected subcommand."""
     if args.analysis_type == "timesteps":
         run_timestep(args)
     elif args.analysis_type == "gravity-checks":
         run_gravity_checks(args)
+    elif args.analysis_type == "gravity-error-map":
+        run_gravity_error_maps(args)
     else:
         raise ValueError(f"Unknown analysis type: {args.analysis_type}")
 
