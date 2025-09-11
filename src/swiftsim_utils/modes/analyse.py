@@ -7,6 +7,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import LogNorm
 from matplotlib.lines import Line2D
 
 from swiftsim_utils.utilities import create_output_path
@@ -820,7 +821,7 @@ def analyse_gravity_error_maps(
             C=norm_error,
             gridsize=resolution,
             cmap="viridis",
-            norm=plt.LogNorm(vmin=1e-7, vmax=1e-1),
+            norm=LogNorm(vmin=1e-7, vmax=1e-1),
         )
         ax1.set_xlabel("X Position")
         ax1.set_ylabel("Y Position")
@@ -836,7 +837,7 @@ def analyse_gravity_error_maps(
             C=norm_error,
             gridsize=resolution,
             cmap="viridis",
-            norm=plt.LogNorm(vmin=1e-7, vmax=1e-1),
+            norm=LogNorm(vmin=1e-7, vmax=1e-1),
         )
         ax2.set_xlabel("X Position")
         ax2.set_ylabel("Z Position")
@@ -852,7 +853,7 @@ def analyse_gravity_error_maps(
             C=norm_error,
             gridsize=resolution,
             cmap="viridis",
-            norm=plt.LogNorm(vmin=1e-7, vmax=1e-1),
+            norm=LogNorm(vmin=1e-7, vmax=1e-1),
         )
         ax3.set_xlabel("Y Position")
         ax3.set_ylabel("Z Position")
@@ -873,7 +874,7 @@ def analyse_gravity_error_maps(
             norm_error,
             gridsize=resolution,
             cmap="viridis",
-            norm=plt.LogNorm(vmin=1e-7, vmax=1e-1),
+            norm=LogNorm(vmin=1e-7, vmax=1e-1),
         )
         ax4.set_xlabel("Distance from Center")
         ax4.set_ylabel("|δa|/|a_exact|")
