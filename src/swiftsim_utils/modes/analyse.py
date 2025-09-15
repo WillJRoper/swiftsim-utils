@@ -194,6 +194,13 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         default=100,
     )
 
+    error_map_parser.add_argument(
+        "--thresh",
+        type=float,
+        help="Error threshold for hexbin color scale (default: 1e-2).",
+        default=1e-2,
+    )
+
 
 def run_timestep(args: argparse.Namespace) -> None:
     """Execute the timestep analysis."""
@@ -230,6 +237,7 @@ def run_gravity_error_maps(args: argparse.Namespace) -> None:
         prefix=args.prefix,
         show_plot=args.show,
         resolution=args.resolution,
+        error_thresh=args.thresh,
     )
 
 
