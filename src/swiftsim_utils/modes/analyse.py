@@ -651,6 +651,12 @@ def analyse_force_checks(
         per99_z = np.percentile(error_z, 99)
         per99_pot = np.percentile(error_pot, 99)
 
+        norm_per90 = np.percentile(norm_error, 90)
+        per90_x = np.percentile(error_x, 90)
+        per90_y = np.percentile(error_y, 90)
+        per90_z = np.percentile(error_z, 90)
+        per90_pot = np.percentile(error_pot, 90)
+
         # Use colors from the color list, cycling if necessary
         color = cols[i % len(cols)]
 
@@ -659,7 +665,7 @@ def analyse_force_checks(
         ax1.text(
             min_error * 1.5,
             1.5 - i / 10.0,
-            f"50%→{median_x:.5f} 99%→{per99_x:.5f}",
+            f"50%→{median_x:.5f} 90%→{per90_x:.5f} 99%→{per99_x:.5f}",
             ha="left",
             va="top",
             color=color,
@@ -669,7 +675,7 @@ def analyse_force_checks(
         ax2.text(
             min_error * 1.5,
             1.5 - i / 10.0,
-            f"50%→{median_y:.5f} 99%→{per99_y:.5f}",
+            f"50%→{median_y:.5f} 90%→{per90_y:.5f} 99%→{per99_y:.5f}",
             ha="left",
             va="top",
             color=color,
@@ -679,7 +685,7 @@ def analyse_force_checks(
         ax3.text(
             min_error * 1.5,
             1.5 - i / 10.0,
-            f"50%→{median_z:.5f} 99%→{per99_z:.5f}",
+            f"50%→{median_z:.5f} 90%→{per90_z:.5f} 99%→{per99_z:.5f}",
             ha="left",
             va="top",
             color=color,
@@ -689,7 +695,7 @@ def analyse_force_checks(
         ax4.text(
             min_error * 1.5,
             1.5 - i / 10.0,
-            f"50%→{norm_median:.5f} 99%→{norm_per99:.5f}",
+            f"50%→{norm_median:.5f} 90%→{norm_per90:.5f} 99%→{norm_per99:.5f}",
             ha="left",
             va="top",
             color=color,
@@ -699,7 +705,7 @@ def analyse_force_checks(
         ax5.text(
             min_error * 1.5,
             1.5 - i / 10.0,
-            f"50%→{median_pot:.5f} 99%→{per99_pot:.5f}",
+            f"50%→{median_pot:.5f} 90%→{per90_pot:.5f} 99%→{per99_pot:.5f}",
             ha="left",
             va="top",
             color=color,
@@ -709,7 +715,8 @@ def analyse_force_checks(
         print(f"  Exact file: {exact_file}")
         print(f"  SWIFT file: {swift_file}")
         print(
-            f"  Norm error - median: {norm_median:.5f}, 99%: {norm_per99:.5f}"
+            f"  Norm error - median: {norm_median:.5f}, 90%: {norm_per90:.5f},"
+            f" 99%: {norm_per99:.5f}",
         )
         print()
 
