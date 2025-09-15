@@ -746,6 +746,7 @@ def analyse_gravity_error_maps(
     prefix: str = None,
     show_plot: bool = True,
     resolution: int = 100,
+    error_thresh: float = 1e-2,
 ) -> None:
     """Create hexbin error maps for gravity check files.
 
@@ -889,6 +890,94 @@ def analyse_gravity_error_maps(
         safe_label = label.replace(" ", "_").replace("/", "_")
         png_file = create_output_path(
             output_path, prefix, f"gravity_error_map_{safe_label}.png"
+        )
+
+        fig.savefig(png_file, dpi=200, bbox_inches="tight")
+        print(f"Error map saved to {png_file}")
+
+        # Show the plot if requested
+        if show_plot:
+            plt.show()
+        plt.close()
+
+        # Create individual error map for this file with error threshold based
+        # colors
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 10))
+        fig.suptitle(f"Gravity Error Maps - {label}", fontsize=16)
+
+        # Remove the axis from the 4th subplot
+        ax4.axis("off")
+
+        # Create mask for errors above and below threshold
+        mask = norm_error < error_thresh
+
+        # X-Y projection
+        ax1.scatter(
+            exact_pos[mask, 0],
+            exact_pos[mask, 1],
+            c="blue",
+            s=1,
+            label=f"|δa|/|a_exact| < {error_thresh:.1e}",
+        )
+        ax1.scatter(
+            exact_pos[~mask, 0],
+            exact_pos[~mask, 1],
+            c="red",
+            s=1,
+            label=f"|δa|/|a_exact| ≥ {error_thresh:.1e}",
+        )
+        ax1.set_xlabel("X Position")
+        ax1.set_ylabel("Y Position")
+        ax1.set_title("X-Y Projection")
+        ax1.set_aspect("equal")
+        ax1.legend(markerscale=5)
+
+        # X-Z projection
+        ax2.scatter(
+            exact_pos[mask, 0],
+            exact_pos[mask, 2],
+            c="blue",
+            s=1,
+            label=f"|δa|/|a_exact| < {error_thresh:.1e}",
+        )
+        ax2.scatter(
+            exact_pos[~mask, 0],
+            exact_pos[~mask, 2],
+            c="red",
+            s=1,
+            label=f"|δa|/|a_exact| ≥ {error_thresh:.1e}",
+        )
+        ax2.set_xlabel("X Position")
+        ax2.set_ylabel("Z Position")
+        ax2.set_title("X-Z Projection")
+        ax2.set_aspect("equal")
+
+        # Y-Z projection
+        ax3.scatter(
+            exact_pos[mask, 1],
+            exact_pos[mask, 2],
+            c="blue",
+            s=1,
+            label=f"|δa|/|a_exact| < {error_thresh:.1e}",
+        )
+        ax3.scatter(
+            exact_pos[~mask, 1],
+            exact_pos[~mask, 2],
+            c="red",
+            s=1,
+            label=f"|δa|/|a_exact| ≥ {error_thresh:.1e}",
+        )
+        ax3.set_xlabel("Y Position")
+        ax3.set_ylabel("Z Position")
+        ax3.set_title("Y-Z Projection")
+        ax3.set_aspect("equal")
+
+        plt.tight_layout()
+
+        # Save the figure
+        safe_label = label.replace(" ", "_").replace("/", "_")
+        png_file = create_output_path(
+            output_path, prefix, f"gravity_binary_error_map_{safe_label}.png"
         )
 
         fig.savefig(png_file, dpi=200, bbox_inches="tight")
