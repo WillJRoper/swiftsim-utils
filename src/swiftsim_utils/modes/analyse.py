@@ -3,6 +3,7 @@
 import argparse
 import glob
 import re
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -1080,7 +1081,8 @@ def analyse_swift_log_timings(
 
     Args:
         log_file: Path to the SWIFT log file.
-        output_path: Optional path to save plots. If None, saves to current directory.
+        output_path: Optional path to save plots. If None, saves to current
+            directory.
         prefix: Optional prefix to add to output filenames.
         show_plot: Whether to display the plots.
         top_n: Number of top functions to show in detailed plots (default: 20).
@@ -1088,16 +1090,9 @@ def analyse_swift_log_timings(
     Raises:
         FileNotFoundError: If the log file cannot be found.
     """
-    import re
-    from collections import Counter, defaultdict
-
-    import matplotlib.pyplot as plt
-    import numpy as np
-
     # Data structures to store timing information
-    function_times = defaultdict(list)  # function_name -> [times]
-    function_calls = Counter()  # function_name -> call_count
-    # category -> [total_times_per_step]
+    function_times = defaultdict(list)
+    function_calls = Counter()
     task_category_times = defaultdict(list)
     step_info = []  # Store step information
 
@@ -1152,6 +1147,8 @@ def analyse_swift_log_timings(
             )
             if task_match:
                 category = task_match.group(1).strip()
+                if category.lower() == "total":
+                    continue
                 time_ms = float(task_match.group(2))
                 percentage = float(task_match.group(3))
                 task_category_times[category].append(time_ms)
