@@ -80,6 +80,8 @@ def create_output_path(
     # Create the output filename with optional prefix
     filename = f"{prefix + '_' if prefix else ''}{base_filename}"
     if output_dir is not None:
+        # Create the output subdirectory if it doesn't exist
+        (path / output_dir).mkdir(parents=True, exist_ok=True)
         output_file = path / output_dir / filename
     else:
         output_file = path / filename
