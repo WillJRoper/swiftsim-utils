@@ -1416,15 +1416,9 @@ Slowest Single Call:
     png_file = create_output_path(
         output_path, prefix, "swift_log_timing_analysis.png"
     )
-    pdf_file = create_output_path(
-        output_path, prefix, "swift_log_timing_analysis.pdf"
-    )
 
-    plt.savefig(png_file, dpi=200, bbox_inches="tight")
+    fig.savefig(png_file, dpi=200, bbox_inches="tight")
     print(f"Timing analysis saved to {png_file}")
-
-    plt.savefig(pdf_file, dpi=200, bbox_inches="tight")
-    print(f"Timing analysis saved to {pdf_file}")
 
     # Show the plot if requested
     if show_plot:
