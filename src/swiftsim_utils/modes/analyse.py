@@ -3,7 +3,6 @@
 import argparse
 import glob
 import re
-from collections import Counter, defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -11,7 +10,7 @@ import numpy as np
 from matplotlib.colors import LogNorm
 from matplotlib.lines import Line2D
 
-from swiftsim_utils.utilities import create_output_path
+from swiftsim_utils.utilities import create_ascii_table, create_output_path
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -1089,6 +1088,12 @@ def analyse_swift_log_timings(
     Raises:
         FileNotFoundError: If the log file cannot be found.
     """
+    import re
+    from collections import Counter, defaultdict
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+
     # Data structures to store timing information
     function_times = defaultdict(list)  # function_name -> [times]
     function_calls = Counter()  # function_name -> call_count
@@ -1180,11 +1185,11 @@ def analyse_swift_log_timings(
         function_stats.items(), key=lambda x: x[1]["total_time"], reverse=True
     )
 
-    # Create comprehensive plots
-    fig = plt.figure(figsize=(20, 15))
+    # Create individual plots instead of one large multisubplot figure
+    plots_created = []
 
     # 1. Top functions by total time
-    ax1 = plt.subplot(3, 3, 1)
+    fig1, ax1 = plt.subplots(figsize=(12, 8))
     top_funcs = sorted_functions[:top_n]
     func_names = [f[0] for f in top_funcs]
     total_times = [f[1]["total_time"] for f in top_funcs]
@@ -1192,12 +1197,15 @@ def analyse_swift_log_timings(
     bars1 = ax1.barh(range(len(func_names)), total_times, color="skyblue")
     ax1.set_yticks(range(len(func_names)))
     ax1.set_yticklabels(
-        [name[:30] + "..." if len(name) > 30 else name for name in func_names],
-        fontsize=8,
+        [name[:40] + "..." if len(name) > 40 else name for name in func_names],
+        fontsize=10,
     )
-    ax1.set_xlabel("Total Time (ms)")
-    ax1.set_title(f"Top {top_n} Functions by Total Time")
-    ax1.grid(True, alpha=0.3)
+    ax1.set_xlabel("Total Time (ms)", fontsize=12)
+    ax1.set_title(
+        f"Top {top_n} Functions by Total Time", fontsize=14, fontweight="bold"
+    )
+    ax1.set_xscale("log")  # Use log scale for time
+    ax1.grid(True, alpha=0.3, axis="x")
 
     # Add time labels on bars
     for i, bar in enumerate(bars1):
@@ -1208,11 +1216,21 @@ def analyse_swift_log_timings(
             f"{width:.1f}ms",
             ha="left",
             va="center",
-            fontsize=7,
+            fontsize=9,
         )
 
+    plt.tight_layout()
+    file1 = create_output_path(
+        output_path, prefix, "01_functions_by_total_time.png"
+    )
+    plt.savefig(file1, dpi=200, bbox_inches="tight")
+    plots_created.append(file1)
+    if show_plot:
+        plt.show()
+    plt.close()
+
     # 2. Top functions by call count
-    ax2 = plt.subplot(3, 3, 2)
+    fig2, ax2 = plt.subplots(figsize=(12, 8))
     sorted_by_calls = sorted(
         function_stats.items(), key=lambda x: x[1]["call_count"], reverse=True
     )
@@ -1223,12 +1241,14 @@ def analyse_swift_log_timings(
     bars2 = ax2.barh(range(len(call_names)), call_counts, color="lightcoral")
     ax2.set_yticks(range(len(call_names)))
     ax2.set_yticklabels(
-        [name[:30] + "..." if len(name) > 30 else name for name in call_names],
-        fontsize=8,
+        [name[:40] + "..." if len(name) > 40 else name for name in call_names],
+        fontsize=10,
     )
-    ax2.set_xlabel("Call Count")
-    ax2.set_title(f"Top {top_n} Functions by Call Count")
-    ax2.grid(True, alpha=0.3)
+    ax2.set_xlabel("Call Count", fontsize=12)
+    ax2.set_title(
+        f"Top {top_n} Functions by Call Count", fontsize=14, fontweight="bold"
+    )
+    ax2.grid(True, alpha=0.3, axis="x")
 
     # Add count labels on bars
     for i, bar in enumerate(bars2):
@@ -1239,13 +1259,22 @@ def analyse_swift_log_timings(
             f"{int(width)}",
             ha="left",
             va="center",
-            fontsize=7,
+            fontsize=9,
         )
 
+    plt.tight_layout()
+    file2 = create_output_path(
+        output_path, prefix, "02_functions_by_call_count.png"
+    )
+    plt.savefig(file2, dpi=200, bbox_inches="tight")
+    plots_created.append(file2)
+    if show_plot:
+        plt.show()
+    plt.close()
+
     # 3. Task categories over time
-    ax3 = plt.subplot(3, 3, 3)
     if task_category_times:
-        # Plot major task categories
+        fig3, ax3 = plt.subplots(figsize=(12, 6))
         major_categories = [
             "gravity",
             "dead time",
@@ -1259,51 +1288,88 @@ def analyse_swift_log_timings(
                 times = task_category_times[category]
                 steps = range(len(times))
                 ax3.plot(
-                    steps, times, label=category, color=colors[i], linewidth=2
+                    steps,
+                    times,
+                    label=category,
+                    color=colors[i],
+                    linewidth=2,
+                    marker="o",
+                    markersize=3,
                 )
 
-        ax3.set_xlabel("Step")
-        ax3.set_ylabel("Time (ms)")
-        ax3.set_title("Major Task Categories Over Time")
-        ax3.legend()
+        ax3.set_xlabel("Step Number", fontsize=12)
+        ax3.set_ylabel("Time (ms)", fontsize=12)
+        ax3.set_title(
+            "Major Task Categories Over Time", fontsize=14, fontweight="bold"
+        )
+        ax3.legend(fontsize=11)
         ax3.grid(True, alpha=0.3)
 
-    # 4. Function timing distribution (violin plot for top functions)
-    ax4 = plt.subplot(3, 3, 4)
+        plt.tight_layout()
+        file3 = create_output_path(
+            output_path, prefix, "03_task_categories_over_time.png"
+        )
+        plt.savefig(file3, dpi=200, bbox_inches="tight")
+        plots_created.append(file3)
+        if show_plot:
+            plt.show()
+        plt.close()
+
+    # 4. Function timing distribution (violin plot)
     violin_data = []
     violin_labels = []
-    for func_name, _ in sorted_functions[:10]:  # Top 10 for violin plot
+    for func_name, _ in sorted_functions[:15]:  # Top 15 for violin plot
         if len(function_times[func_name]) > 1:  # Need multiple data points
             violin_data.append(function_times[func_name])
             violin_labels.append(
-                func_name[:20] + "..." if len(func_name) > 20 else func_name
+                func_name[:25] + "..." if len(func_name) > 25 else func_name
             )
 
     if violin_data:
+        fig4, ax4 = plt.subplots(figsize=(14, 8))
         parts = ax4.violinplot(
             violin_data,
             range(len(violin_data)),
             showmeans=True,
             showmedians=True,
         )
+
+        # Customize violin plot colors
+        for pc in parts["bodies"]:
+            pc.set_facecolor("lightblue")
+            pc.set_alpha(0.7)
+
         ax4.set_xticks(range(len(violin_labels)))
-        ax4.set_xticklabels(violin_labels, rotation=45, ha="right", fontsize=8)
-        ax4.set_ylabel("Time (ms)")
-        ax4.set_title("Timing Distribution for Top Functions")
+        ax4.set_xticklabels(
+            violin_labels, rotation=45, ha="right", fontsize=10
+        )
+        ax4.set_ylabel("Time (ms)", fontsize=12)
+        ax4.set_title(
+            "Timing Distribution for Top Functions",
+            fontsize=14,
+            fontweight="bold",
+        )
         ax4.grid(True, alpha=0.3)
 
-    # 5. Task category pie chart (average percentages)
-    ax5 = plt.subplot(3, 3, 5)
+        plt.tight_layout()
+        file4 = create_output_path(
+            output_path, prefix, "04_timing_distribution.png"
+        )
+        plt.savefig(file4, dpi=200, bbox_inches="tight")
+        plots_created.append(file4)
+        if show_plot:
+            plt.show()
+        plt.close()
+
+    # 5. Task category pie chart
     if task_category_times:
-        # Calculate average percentages for major categories
+        fig5, ax5 = plt.subplots(figsize=(10, 8))
         category_averages = {}
         for category, times in task_category_times.items():
-            if times:  # Only include categories with data
-                # Estimate percentage based on proportion of total time
+            if times:
                 total_time = sum(times)
                 category_averages[category] = total_time
 
-        # Get top categories for pie chart
         sorted_categories = sorted(
             category_averages.items(), key=lambda x: x[1], reverse=True
         )
@@ -1312,44 +1378,107 @@ def analyse_swift_log_timings(
         labels = [cat[0] for cat in pie_categories]
         sizes = [cat[1] for cat in pie_categories]
 
-        ax5.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=90)
-        ax5.set_title("Time Distribution by Task Category")
+        wedges, texts, autotexts = ax5.pie(
+            sizes, labels=labels, autopct="%1.1f%%", startangle=90
+        )
+        ax5.set_title(
+            "Time Distribution by Task Category",
+            fontsize=14,
+            fontweight="bold",
+        )
+
+        # Improve text formatting
+        for autotext in autotexts:
+            autotext.set_color("white")
+            autotext.set_fontweight("bold")
+
+        plt.tight_layout()
+        file5 = create_output_path(
+            output_path, prefix, "05_task_category_pie.png"
+        )
+        plt.savefig(file5, dpi=200, bbox_inches="tight")
+        plots_created.append(file5)
+        if show_plot:
+            plt.show()
+        plt.close()
 
     # 6. Step timing evolution
-    ax6 = plt.subplot(3, 3, 6)
     if step_info:
+        fig6, ax6 = plt.subplots(figsize=(12, 6))
         steps = [s["step"] for s in step_info]
-        times = [s["time_3"] for s in step_info]  # Use time_3 as main timing
-        ax6.plot(steps, times, "b-", linewidth=1, alpha=0.7)
-        ax6.set_xlabel("Step Number")
-        ax6.set_ylabel("Step Time")
-        ax6.set_title("Step Timing Evolution")
+        times = [s["time_3"] for s in step_info]
+        ax6.plot(
+            steps,
+            times,
+            "b-",
+            linewidth=2,
+            alpha=0.8,
+            marker="o",
+            markersize=2,
+        )
+        ax6.set_xlabel("Step Number", fontsize=12)
+        ax6.set_ylabel("Step Time", fontsize=12)
+        ax6.set_title("Step Timing Evolution", fontsize=14, fontweight="bold")
         ax6.grid(True, alpha=0.3)
 
+        plt.tight_layout()
+        file6 = create_output_path(
+            output_path, prefix, "06_step_timing_evolution.png"
+        )
+        plt.savefig(file6, dpi=200, bbox_inches="tight")
+        plots_created.append(file6)
+        if show_plot:
+            plt.show()
+        plt.close()
+
     # 7. Function efficiency (time per call)
-    ax7 = plt.subplot(3, 3, 7)
+    fig7, ax7 = plt.subplots(figsize=(12, 8))
     efficiency_data = []
-    for func_name, stats in sorted_functions[:15]:
+    for func_name, stats in sorted_functions[:20]:
         efficiency = stats["total_time"] / stats["call_count"]
         efficiency_data.append((func_name, efficiency))
 
     efficiency_data.sort(key=lambda x: x[1], reverse=True)
     eff_names = [
-        e[0][:25] + "..." if len(e[0]) > 25 else e[0] for e in efficiency_data
+        e[0][:35] + "..." if len(e[0]) > 35 else e[0] for e in efficiency_data
     ]
     eff_values = [e[1] for e in efficiency_data]
 
     bars7 = ax7.barh(range(len(eff_names)), eff_values, color="lightgreen")
     ax7.set_yticks(range(len(eff_names)))
-    ax7.set_yticklabels(eff_names, fontsize=8)
-    ax7.set_xlabel("Average Time per Call (ms)")
-    ax7.set_title("Function Efficiency (Time/Call)")
-    ax7.grid(True, alpha=0.3)
+    ax7.set_yticklabels(eff_names, fontsize=10)
+    ax7.set_xlabel("Average Time per Call (ms)", fontsize=12)
+    ax7.set_title(
+        "Function Efficiency (Time per Call)", fontsize=14, fontweight="bold"
+    )
+    ax7.grid(True, alpha=0.3, axis="x")
+
+    # Add efficiency labels on bars
+    for i, bar in enumerate(bars7):
+        width = bar.get_width()
+        ax7.text(
+            width + max(eff_values) * 0.01,
+            bar.get_y() + bar.get_height() / 2,
+            f"{width:.2f}ms",
+            ha="left",
+            va="center",
+            fontsize=9,
+        )
+
+    plt.tight_layout()
+    file7 = create_output_path(
+        output_path, prefix, "07_function_efficiency.png"
+    )
+    plt.savefig(file7, dpi=200, bbox_inches="tight")
+    plots_created.append(file7)
+    if show_plot:
+        plt.show()
+    plt.close()
 
     # 8. Cumulative time analysis
-    ax8 = plt.subplot(3, 3, 8)
+    fig8, ax8 = plt.subplots(figsize=(10, 6))
     cumulative_times = np.cumsum(
-        [f[1]["total_time"] for f in sorted_functions[:20]]
+        [f[1]["total_time"] for f in sorted_functions[:25]]
     )
     cumulative_percent = 100 * cumulative_times / cumulative_times[-1]
 
@@ -1358,104 +1487,184 @@ def analyse_swift_log_timings(
         cumulative_percent,
         "ro-",
         linewidth=2,
+        markersize=4,
     )
-    ax8.set_xlabel("Number of Top Functions")
-    ax8.set_ylabel("Cumulative Percentage of Total Time")
-    ax8.set_title("Cumulative Time Distribution")
+    ax8.set_xlabel("Number of Top Functions", fontsize=12)
+    ax8.set_ylabel("Cumulative Percentage of Total Time", fontsize=12)
+    ax8.set_title(
+        "Cumulative Time Distribution Analysis", fontsize=14, fontweight="bold"
+    )
     ax8.grid(True, alpha=0.3)
-    ax8.axhline(y=80, color="r", linestyle="--", alpha=0.5, label="80% line")
-    ax8.legend()
-
-    # 9. Summary statistics text
-    ax9 = plt.subplot(3, 3, 9)
-    ax9.axis("off")
-
-    # Calculate summary statistics
-    total_logged_time = sum(
-        stats["total_time"] for stats in function_stats.values()
+    ax8.axhline(
+        y=80,
+        color="r",
+        linestyle="--",
+        alpha=0.7,
+        linewidth=2,
+        label="80% threshold",
     )
-    most_called_func = max(
-        function_stats.items(), key=lambda x: x[1]["call_count"]
+    ax8.axhline(
+        y=90,
+        color="orange",
+        linestyle="--",
+        alpha=0.7,
+        linewidth=2,
+        label="90% threshold",
     )
-    slowest_func = max(function_stats.items(), key=lambda x: x[1]["max_time"])
-
-    summary_text = f"""Log Analysis Summary:
-    
-Total Functions: {len(function_stats)}
-Total Logged Time: {total_logged_time:.1f} ms
-Total Steps: {len(step_info)}
-
-Most Time Consuming:
-{sorted_functions[0][0][:40]}
-({sorted_functions[0][1]["total_time"]:.1f} ms)
-
-Most Called Function:
-{most_called_func[0][:40]}
-({most_called_func[1]["call_count"]} calls)
-
-Slowest Single Call:
-{slowest_func[0][:40]}
-({slowest_func[1]["max_time"]:.1f} ms)
-"""
-
-    ax9.text(
-        0.05,
-        0.95,
-        summary_text,
-        transform=ax9.transAxes,
-        fontsize=10,
-        verticalalignment="top",
-        horizontalalignment="left",
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.8),
-        family="monospace",
-    )
+    ax8.legend(fontsize=11)
 
     plt.tight_layout()
-
-    # Save the plot
-    png_file = create_output_path(
-        output_path, prefix, "swift_log_timing_analysis.png"
+    file8 = create_output_path(
+        output_path, prefix, "08_cumulative_time_analysis.png"
     )
-
-    fig.savefig(png_file, dpi=200, bbox_inches="tight")
-    print(f"Timing analysis saved to {png_file}")
-
-    # Show the plot if requested
+    plt.savefig(file8, dpi=200, bbox_inches="tight")
+    plots_created.append(file8)
     if show_plot:
         plt.show()
     plt.close()
 
-    # Print detailed statistics
-    print("\n" + "=" * 80)
-    print("DETAILED TIMING ANALYSIS")
-    print("=" * 80)
+    print(f"\nCreated {len(plots_created)} individual plots:")
+    for plot_file in plots_created:
+        print(f"  - {plot_file}")
+    print()
 
-    print("\nTOP 10 FUNCTIONS BY TOTAL TIME:")
-    print("-" * 80)
-    for i, (func_name, stats) in enumerate(sorted_functions[:10]):
-        print(
-            f"{i + 1:2d}. {func_name[:50]:50} {stats['total_time']:8.1f} ms ({stats['call_count']:4d} calls)"
+    # Print detailed statistics with proper tables
+    print("\n" + "=" * 100)
+    print("DETAILED TIMING ANALYSIS")
+    print("=" * 100)
+
+    # Calculate total time for percentage calculations
+    total_time = sum(stats["total_time"] for stats in function_stats.values())
+
+    # Top functions by total time table
+    headers = [
+        "Function Name",
+        "Total Time (ms)",
+        "% of Total",
+        "Calls",
+        "Avg/Call (ms)",
+        "Max (ms)",
+    ]
+    rows = []
+    for i, (func_name, stats) in enumerate(sorted_functions[:15]):
+        percentage = (
+            (stats["total_time"] / total_time * 100) if total_time > 0 else 0
+        )
+        avg_per_call = stats["total_time"] / stats["call_count"]
+        rows.append(
+            [
+                func_name[:40] + "..." if len(func_name) > 40 else func_name,
+                f"{stats['total_time']:.1f}",
+                f"{percentage:.1f}%",
+                f"{stats['call_count']}",
+                f"{avg_per_call:.2f}",
+                f"{stats['max_time']:.1f}",
+            ]
         )
 
-    print("\nTOP 10 FUNCTIONS BY CALL COUNT:")
-    print("-" * 80)
+    print(create_ascii_table(headers, rows, "TOP 15 FUNCTIONS BY TOTAL TIME"))
+
+    # Top functions by call count table
+    headers = [
+        "Function Name",
+        "Call Count",
+        "Total Time (ms)",
+        "% of Total",
+        "Avg/Call (ms)",
+    ]
+    rows = []
     sorted_by_calls = sorted(
         function_stats.items(), key=lambda x: x[1]["call_count"], reverse=True
     )
-    for i, (func_name, stats) in enumerate(sorted_by_calls[:10]):
-        print(
-            f"{i + 1:2d}. {func_name[:50]:50} {stats['call_count']:4d} calls ({stats['total_time']:8.1f} ms total)"
+    for i, (func_name, stats) in enumerate(sorted_by_calls[:15]):
+        percentage = (
+            (stats["total_time"] / total_time * 100) if total_time > 0 else 0
+        )
+        avg_per_call = stats["total_time"] / stats["call_count"]
+        rows.append(
+            [
+                func_name[:40] + "..." if len(func_name) > 40 else func_name,
+                f"{stats['call_count']}",
+                f"{stats['total_time']:.1f}",
+                f"{percentage:.1f}%",
+                f"{avg_per_call:.2f}",
+            ]
         )
 
+    print(
+        "\n"
+        + create_ascii_table(headers, rows, "TOP 15 FUNCTIONS BY CALL COUNT")
+    )
+
+    # Task category summary table
     if task_category_times:
-        print("\nTASK CATEGORY SUMMARY:")
-        print("-" * 80)
+        headers = [
+            "Task Category",
+            "Total Time (ms)",
+            "% of Category Time",
+            "Avg/Step (ms)",
+            "Steps",
+        ]
+        rows = []
+        category_total_time = sum(
+            sum(times) for times in task_category_times.values()
+        )
+
         for category, times in sorted(
             task_category_times.items(), key=lambda x: sum(x[1]), reverse=True
         ):
             if times:
-                avg_time = np.mean(times)
-                total_time = sum(times)
-                print(
-                    f"{category[:30]:30} {total_time:10.1f} ms total, {avg_time:8.1f} ms avg ({len(times):3d} steps)"
+                total_cat_time = sum(times)
+                avg_time = total_cat_time / len(times)
+                percentage = (
+                    (total_cat_time / category_total_time * 100)
+                    if category_total_time > 0
+                    else 0
                 )
+                rows.append(
+                    [
+                        category[:30] + "..."
+                        if len(category) > 30
+                        else category,
+                        f"{total_cat_time:.1f}",
+                        f"{percentage:.1f}%",
+                        f"{avg_time:.1f}",
+                        f"{len(times)}",
+                    ]
+                )
+
+        print(
+            "\n" + create_ascii_table(headers, rows, "TASK CATEGORY SUMMARY")
+        )
+
+    # Performance summary statistics
+    print("\nPERFORMANCE SUMMARY:")
+    print("-" * 100)
+    print(f"Total logged function time: {total_time:.1f} ms")
+    print(f"Total unique functions: {len(function_stats)}")
+    print(
+        f"Total function calls: {sum(stats['call_count'] for stats in function_stats.values())}"
+    )
+    print(f"Steps processed: {len(step_info)}")
+
+    if len(sorted_functions) >= 5:
+        top_5_time = sum(
+            stats["total_time"] for _, stats in sorted_functions[:5]
+        )
+        top_5_percent = (
+            (top_5_time / total_time * 100) if total_time > 0 else 0
+        )
+        print(
+            f"Top 5 functions account for: {top_5_percent:.1f}% of total time"
+        )
+
+    if len(sorted_functions) >= 10:
+        top_10_time = sum(
+            stats["total_time"] for _, stats in sorted_functions[:10]
+        )
+        top_10_percent = (
+            (top_10_time / total_time * 100) if total_time > 0 else 0
+        )
+        print(
+            f"Top 10 functions account for: {top_10_percent:.1f}% of total time"
+        )
