@@ -1613,7 +1613,7 @@ def analyse_swift_log_timings(
                 label=task_type,
                 color=colors[i],
                 marker=".",
-                markersize=2,
+                s=2,
                 alpha=0.7,
             )
 
