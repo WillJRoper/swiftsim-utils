@@ -1094,8 +1094,8 @@ def analyse_swift_log_timings(
     function_times = defaultdict(list)
     function_calls = Counter()
     task_category_times = defaultdict(list)
-    step_info = []  # Store step information
-
+    task_counts = defaultdict(list)
+    step_info = []
     print(f"Analyzing SWIFT log file: {log_file}")
 
     # Make an output directory to hold all the plots
@@ -1166,8 +1166,24 @@ def analyse_swift_log_timings(
                 }
                 continue
 
+            # Extract task count information
+            task_count_match = re.search(r"task counts are \[(.*)\]", line)
+            if task_count_match:
+                task_count_str = task_count_match.group(1)
+                # Parse individual task counts
+                for task_pair in task_count_str.split():
+                    if "=" in task_pair:
+                        task_name, count_str = task_pair.split("=")
+                        try:
+                            count = int(count_str)
+                            task_counts[task_name].append(count)
+                        except ValueError:
+                            continue
+                continue
+
     print(f"Found {len(function_times)} unique function calls")
     print(f"Found {len(task_category_times)} task categories")
+    print(f"Found {len(task_counts)} task types")
     print(f"Processed {len(step_info)} steps")
 
     # Calculate statistics
@@ -1420,30 +1436,48 @@ def analyse_swift_log_timings(
             plt.show()
         plt.close()
 
-    # 6. Step timing evolution
-    if step_info:
-        fig6, ax6 = plt.subplots(figsize=(12, 6))
-        steps = [s["step"] for s in step_info]
-        times = [s["time_3"] for s in step_info]
-        ax6.plot(
-            steps,
-            times,
-            "b-",
-            linewidth=2,
-            alpha=0.8,
-            marker="o",
-            markersize=2,
-        )
+    # 6. Top task categories over time (instead of step timing evolution)
+    if task_category_times:
+        fig6, ax6 = plt.subplots(figsize=(12, 8))
+
+        # Get top N task categories by total time (excluding 'total')
+        category_totals = {}
+        for category, times in task_category_times.items():
+            if times and category.lower() != "total":
+                category_totals[category] = sum(times)
+
+        top_categories = sorted(
+            category_totals.items(), key=lambda x: x[1], reverse=True
+        )[:6]
+        colors = plt.cm.Set3(np.linspace(0, 1, len(top_categories)))
+
+        for i, (category, _) in enumerate(top_categories):
+            times = task_category_times[category]
+            steps = range(len(times))
+            ax6.plot(
+                steps,
+                times,
+                label=category,
+                color=colors[i],
+                linewidth=2,
+                marker="o",
+                markersize=3,
+            )
+
         ax6.set_xlabel("Step Number", fontsize=12)
-        ax6.set_ylabel("Step Time", fontsize=12)
-        ax6.set_title("Step Timing Evolution", fontsize=14, fontweight="bold")
+        ax6.set_ylabel("Time (ms)", fontsize=12)
+        ax6.set_yscale("log")  # Use log scale for time
+        ax6.set_title(
+            "Top Task Categories Over Time", fontsize=14, fontweight="bold"
+        )
+        ax6.legend(fontsize=11)
         ax6.grid(True, alpha=0.3)
 
         plt.tight_layout()
         file6 = create_output_path(
             output_path,
             prefix,
-            "06_step_timing_evolution.png",
+            "06_top_tasks_over_time.png",
             out_dir,
         )
         plt.savefig(file6, dpi=200, bbox_inches="tight")
@@ -1549,6 +1583,61 @@ def analyse_swift_log_timings(
     if show_plot:
         plt.show()
     plt.close()
+
+    # 9. Task count analysis over time
+    if task_counts:
+        fig9, ax9 = plt.subplots(figsize=(14, 8))
+
+        # Get top task types by maximum count (excluding 'skipped' and 'none')
+        task_max_counts = {}
+        for task_type, counts in task_counts.items():
+            if (
+                counts
+                and task_type not in ["skipped", "none"]
+                and max(counts) > 0
+            ):
+                task_max_counts[task_type] = max(counts)
+
+        # Sort by maximum count and take top 10
+        top_task_types = sorted(
+            task_max_counts.items(), key=lambda x: x[1], reverse=True
+        )[:10]
+        colors = plt.cm.tab20(np.linspace(0, 1, len(top_task_types)))
+
+        for i, (task_type, _) in enumerate(top_task_types):
+            counts = task_counts[task_type]
+            steps = range(len(counts))
+            ax9.plot(
+                steps,
+                counts,
+                label=task_type,
+                color=colors[i],
+                linewidth=2,
+                marker="o",
+                markersize=2,
+            )
+
+        ax9.set_xlabel("Step Number", fontsize=12)
+        ax9.set_ylabel("Task Count", fontsize=12)
+        ax9.set_yscale("log")  # Use log scale for task counts
+        ax9.set_title(
+            "Top Task Types Over Time", fontsize=14, fontweight="bold"
+        )
+        ax9.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=10)
+        ax9.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        file9 = create_output_path(
+            output_path,
+            prefix,
+            "09_task_counts_over_time.png",
+            out_dir,
+        )
+        plt.savefig(file9, dpi=200, bbox_inches="tight")
+        plots_created.append(file9)
+        if show_plot:
+            plt.show()
+        plt.close()
 
     print(f"\nCreated {len(plots_created)} individual plots:")
     for plot_file in plots_created:
@@ -1664,6 +1753,50 @@ def analyse_swift_log_timings(
             "\n" + create_ascii_table(headers, rows, "TASK CATEGORY SUMMARY")
         )
 
+    # Task count summary table
+    if task_counts:
+        headers = [
+            "Task Type",
+            "Total Count",
+            "Max Count",
+            "Avg/Step",
+            "Steps",
+            "% Non-Zero",
+        ]
+        rows = []
+
+        # Calculate total counts for each task type
+        for task_type, counts in sorted(
+            task_counts.items(), key=lambda x: sum(x[1]), reverse=True
+        ):
+            if counts:
+                total_count = sum(counts)
+                max_count = max(counts)
+                avg_count = total_count / len(counts)
+                non_zero_steps = sum(1 for c in counts if c > 0)
+                non_zero_percent = (
+                    (non_zero_steps / len(counts) * 100)
+                    if len(counts) > 0
+                    else 0
+                )
+
+                # Only include task types that actually have some counts
+                if total_count > 0:
+                    rows.append(
+                        [
+                            task_type[:25] + "..."
+                            if len(task_type) > 25
+                            else task_type,
+                            f"{total_count}",
+                            f"{max_count}",
+                            f"{avg_count:.1f}",
+                            f"{len(counts)}",
+                            f"{non_zero_percent:.1f}%",
+                        ]
+                    )
+
+        print("\n" + create_ascii_table(headers, rows, "TASK COUNT SUMMARY"))
+
     # Performance summary statistics
     print("\nPERFORMANCE SUMMARY:")
     print("-" * 100)
@@ -1695,3 +1828,17 @@ def analyse_swift_log_timings(
         print(
             f"Top 10 functions account for: {top_10_percent:.1f}% of total time"
         )
+    if task_counts:
+        total_tasks_all_steps = sum(
+            sum(counts) for counts in task_counts.values()
+        )
+        print(f"Total tasks across all steps: {total_tasks_all_steps}")
+
+        # Find most common task types
+        if task_counts:
+            most_common_task = max(
+                task_counts.items(), key=lambda x: sum(x[1])
+            )
+            print(
+                f"Most common task type: {most_common_task[0]} ({sum(most_common_task[1])} total)"
+            )
