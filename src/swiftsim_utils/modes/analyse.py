@@ -1238,6 +1238,9 @@ def analyse_swift_log_timings(
             fontsize=9,
         )
 
+    # Extend the x axis limit for better label visibility
+    ax1.set_xlim(0, max(total_times) * 1.1)
+
     plt.tight_layout()
     file1 = create_output_path(
         output_path,
@@ -1271,6 +1274,9 @@ def analyse_swift_log_timings(
         f"Top {top_n} Functions by Call Count", fontsize=14, fontweight="bold"
     )
     ax2.grid(True, alpha=0.3, axis="x")
+
+    # Extend the x axis limit for better label visibility
+    ax2.set_xlim(0, max(call_counts) * 1.1)
 
     # Add count labels on bars
     for i, bar in enumerate(bars2):
@@ -1312,14 +1318,14 @@ def analyse_swift_log_timings(
             if category in task_category_times:
                 times = task_category_times[category]
                 steps = range(len(times))
-                ax3.plot(
+                ax3.scatter(
                     steps,
                     times,
                     label=category,
                     color=colors[i],
-                    linewidth=2,
-                    marker="o",
-                    markersize=3,
+                    marker=".",
+                    s=5,
+                    alpha=0.7,
                 )
 
         ax3.set_xlabel("Step Number", fontsize=12)
@@ -1436,7 +1442,7 @@ def analyse_swift_log_timings(
             plt.show()
         plt.close()
 
-    # 6. Top task categories over time (instead of step timing evolution)
+    # 6. Top task categories over time
     if task_category_times:
         fig6, ax6 = plt.subplots(figsize=(12, 8))
 
@@ -1454,14 +1460,14 @@ def analyse_swift_log_timings(
         for i, (category, _) in enumerate(top_categories):
             times = task_category_times[category]
             steps = range(len(times))
-            ax6.plot(
+            ax6.scatter(
                 steps,
                 times,
                 label=category,
                 color=colors[i],
-                linewidth=2,
-                marker="o",
-                markersize=3,
+                marker=".",
+                s=5,
+                alpha=0.7,
             )
 
         ax6.set_xlabel("Step Number", fontsize=12)
@@ -1519,6 +1525,9 @@ def analyse_swift_log_timings(
             va="center",
             fontsize=9,
         )
+
+    # Extend the x axis limit for better label visibility
+    ax7.set_xlim(0, max(eff_values) * 1.1)
 
     plt.tight_layout()
     file7 = create_output_path(
@@ -1613,7 +1622,7 @@ def analyse_swift_log_timings(
                 label=task_type,
                 color=colors[i],
                 marker=".",
-                s=2,
+                s=5,
                 alpha=0.7,
             )
 
