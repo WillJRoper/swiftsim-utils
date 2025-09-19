@@ -1607,14 +1607,14 @@ def analyse_swift_log_timings(
         for i, (task_type, _) in enumerate(top_task_types):
             counts = task_counts[task_type]
             steps = range(len(counts))
-            ax9.plot(
+            ax9.scatter(
                 steps,
                 counts,
                 label=task_type,
                 color=colors[i],
-                linewidth=2,
-                marker="o",
+                marker=".",
                 markersize=2,
+                alpha=0.7,
             )
 
         ax9.set_xlabel("Step Number", fontsize=12)
@@ -1760,8 +1760,6 @@ def analyse_swift_log_timings(
             "Total Count",
             "Max Count",
             "Avg/Step",
-            "Steps",
-            "% Non-Zero",
         ]
         rows = []
 
@@ -1773,12 +1771,6 @@ def analyse_swift_log_timings(
                 total_count = sum(counts)
                 max_count = max(counts)
                 avg_count = total_count / len(counts)
-                non_zero_steps = sum(1 for c in counts if c > 0)
-                non_zero_percent = (
-                    (non_zero_steps / len(counts) * 100)
-                    if len(counts) > 0
-                    else 0
-                )
 
                 # Only include task types that actually have some counts
                 if total_count > 0:
@@ -1790,8 +1782,6 @@ def analyse_swift_log_timings(
                             f"{total_count}",
                             f"{max_count}",
                             f"{avg_count:.1f}",
-                            f"{len(counts)}",
-                            f"{non_zero_percent:.1f}%",
                         ]
                     )
 
