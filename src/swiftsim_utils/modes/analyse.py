@@ -3,6 +3,7 @@
 import argparse
 import glob
 import re
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -1088,12 +1089,6 @@ def analyse_swift_log_timings(
     Raises:
         FileNotFoundError: If the log file cannot be found.
     """
-    import re
-    from collections import Counter, defaultdict
-
-    import matplotlib.pyplot as plt
-    import numpy as np
-
     # Data structures to store timing information
     function_times = defaultdict(list)  # function_name -> [times]
     function_calls = Counter()  # function_name -> call_count
@@ -1113,21 +1108,28 @@ def analyse_swift_log_timings(
 
             # Extract step information (the numbered lines)
             step_match = re.match(
-                r"^\s*(\d+)\s+([\d.e-]+)\s+([\d.e-]+)\s+([\d.e-]+)\s+([\d.e-]+)",
+                r"^\s*(\d+)\s+([\d.e+-]+)\s+([\d.e+-]+)\s+([\d.e+-]+)\s+([\d.e+-]+)",
                 line,
             )
             if step_match:
-                step_num = int(step_match.group(1))
-                current_step = step_num
-                step_info.append(
-                    {
-                        "step": step_num,
-                        "time_1": float(step_match.group(2)),
-                        "time_2": float(step_match.group(3)),
-                        "time_3": float(step_match.group(4)),
-                        "time_4": float(step_match.group(5)),
-                    }
-                )
+                try:
+                    step_num = int(step_match.group(1))
+                    current_step = step_num
+                    step_info.append(
+                        {
+                            "step": step_num,
+                            "time_1": float(step_match.group(2)),
+                            "time_2": float(step_match.group(3)),
+                            "time_3": float(step_match.group(4)),
+                            "time_4": float(step_match.group(5)),
+                        }
+                    )
+                except ValueError as e:
+                    # Skip malformed lines but print warning
+                    print(
+                        f"Warning: Could not parse step line: {line.strip()}"
+                    )
+                    print(f"  Error: {e}")
                 continue
 
             # Extract function timing information
@@ -1427,7 +1429,7 @@ Slowest Single Call:
     # Show the plot if requested
     if show_plot:
         plt.show()
-    plt.close(fig)
+    plt.close()
 
     # Print detailed statistics
     print("\n" + "=" * 80)
