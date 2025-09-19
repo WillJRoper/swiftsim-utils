@@ -1098,6 +1098,12 @@ def analyse_swift_log_timings(
 
     print(f"Analyzing SWIFT log file: {log_file}")
 
+    # Make an output directory to hold all the plots
+    if prefix is None:
+        out_dir = "runtime_analysis"
+    else:
+        out_dir = f"{prefix}_runtime_analysis"
+
     # Read and parse the log file
     with open(log_file, "r") as f:
         current_step = None
@@ -1218,7 +1224,10 @@ def analyse_swift_log_timings(
 
     plt.tight_layout()
     file1 = create_output_path(
-        output_path, prefix, "01_functions_by_total_time.png"
+        output_path,
+        prefix,
+        "01_functions_by_total_time.png",
+        out_dir,
     )
     plt.savefig(file1, dpi=200, bbox_inches="tight")
     plots_created.append(file1)
@@ -1261,7 +1270,10 @@ def analyse_swift_log_timings(
 
     plt.tight_layout()
     file2 = create_output_path(
-        output_path, prefix, "02_functions_by_call_count.png"
+        output_path,
+        prefix,
+        "02_functions_by_call_count.png",
+        out_dir,
     )
     plt.savefig(file2, dpi=200, bbox_inches="tight")
     plots_created.append(file2)
@@ -1304,7 +1316,10 @@ def analyse_swift_log_timings(
 
         plt.tight_layout()
         file3 = create_output_path(
-            output_path, prefix, "03_task_categories_over_time.png"
+            output_path,
+            prefix,
+            "03_task_categories_over_time.png",
+            out_dir,
         )
         plt.savefig(file3, dpi=200, bbox_inches="tight")
         plots_created.append(file3)
@@ -1350,7 +1365,10 @@ def analyse_swift_log_timings(
 
         plt.tight_layout()
         file4 = create_output_path(
-            output_path, prefix, "04_timing_distribution.png"
+            output_path,
+            prefix,
+            "04_timing_distribution.png",
+            out_dir,
         )
         plt.savefig(file4, dpi=200, bbox_inches="tight")
         plots_created.append(file4)
@@ -1391,7 +1409,10 @@ def analyse_swift_log_timings(
 
         plt.tight_layout()
         file5 = create_output_path(
-            output_path, prefix, "05_task_category_pie.png"
+            output_path,
+            prefix,
+            "05_task_category_pie.png",
+            out_dir,
         )
         plt.savefig(file5, dpi=200, bbox_inches="tight")
         plots_created.append(file5)
@@ -1420,7 +1441,10 @@ def analyse_swift_log_timings(
 
         plt.tight_layout()
         file6 = create_output_path(
-            output_path, prefix, "06_step_timing_evolution.png"
+            output_path,
+            prefix,
+            "06_step_timing_evolution.png",
+            out_dir,
         )
         plt.savefig(file6, dpi=200, bbox_inches="tight")
         plots_created.append(file6)
@@ -1464,7 +1488,10 @@ def analyse_swift_log_timings(
 
     plt.tight_layout()
     file7 = create_output_path(
-        output_path, prefix, "07_function_efficiency.png"
+        output_path,
+        prefix,
+        "07_function_efficiency.png",
+        out_dir,
     )
     plt.savefig(file7, dpi=200, bbox_inches="tight")
     plots_created.append(file7)
@@ -1512,7 +1539,10 @@ def analyse_swift_log_timings(
 
     plt.tight_layout()
     file8 = create_output_path(
-        output_path, prefix, "08_cumulative_time_analysis.png"
+        output_path,
+        prefix,
+        "08_cumulative_time_analysis.png",
+        out_dir,
     )
     plt.savefig(file8, dpi=200, bbox_inches="tight")
     plots_created.append(file8)

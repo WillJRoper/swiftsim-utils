@@ -45,6 +45,7 @@ def create_output_path(
     output_path: str | None = None,
     prefix: str | None = None,
     base_filename: str = "output.png",
+    output_dir: str | None = None,
 ) -> Path:
     """Create and validate output path for saving files.
 
@@ -53,6 +54,7 @@ def create_output_path(
            current directory.
         prefix: Optional prefix to add to the filename.
         base_filename: Base filename to use (default: "output.png").
+        output_dir: An optional directory to hold the outputs.
 
     Returns:
         Path: Complete path to the output file.
@@ -77,7 +79,10 @@ def create_output_path(
 
     # Create the output filename with optional prefix
     filename = f"{prefix + '_' if prefix else ''}{base_filename}"
-    output_file = path / filename
+    if output_dir is not None:
+        output_file = path / output_dir / filename
+    else:
+        output_file = path / filename
 
     return output_file
 
