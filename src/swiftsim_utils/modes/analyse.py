@@ -1146,6 +1146,7 @@ def analyse_swift_log_timings(
             if timing_match:
                 func_name = timing_match.group(1).strip()
                 time_ms = float(timing_match.group(2))
+                print(func_name, time_ms)
                 function_times[func_name].append(time_ms)
                 function_calls[func_name] += 1
                 continue
