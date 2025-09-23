@@ -1327,7 +1327,7 @@ def analyse_swift_log_timings(
                     label=category,
                     color=colors[i],
                     marker=".",
-                    s=5,
+                    s=10,
                     alpha=0.7,
                 )
 
@@ -1469,7 +1469,7 @@ def analyse_swift_log_timings(
                 label=category,
                 color=colors[i],
                 marker=".",
-                s=5,
+                s=10,
                 alpha=0.7,
             )
 
@@ -1625,7 +1625,7 @@ def analyse_swift_log_timings(
                 label=task_type,
                 color=colors[i],
                 marker=".",
-                s=5,
+                s=10,
                 alpha=0.7,
             )
 
