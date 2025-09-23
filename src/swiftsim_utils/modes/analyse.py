@@ -1114,7 +1114,8 @@ def analyse_swift_log_timings(
 
             # Extract step information (the numbered lines)
             step_match = re.match(
-                r"^\s*(\d+)\s+([\d.e+-]+)\s+([\d.e+-]+)\s+([\d.e+-]+)\s+([\d.e+-]+)",
+                r"^\s*(\d+)\s+([\d.e+-]+)\s+([\d.e+-]+)"
+                r"\s+([\d.e+-]+)\s+([\d.e+-]+)",
                 line,
             )
             if step_match:
@@ -1139,7 +1140,9 @@ def analyse_swift_log_timings(
                 continue
 
             # Extract function timing information
-            timing_match = re.search(r"\] ([^:]+): took ([\d.]+) ms", line)
+            timing_match = re.search(
+                r"\[\d+\.\d+\] ([^:]+: .+) took ([\d.]+) ms", line
+            )
             if timing_match:
                 func_name = timing_match.group(1).strip()
                 time_ms = float(timing_match.group(2))
