@@ -155,9 +155,23 @@ def clear_swift_config() -> None:
 
     This will delete the configuration file if it exists.
     """
+    # Make sure the user is sure they want to do this
+    confirm = input(
+        "Are you sure you want to clear all SWIFT-CLI profiles?"
+        " This action cannot be undone. (y/N): "
+    )
+    if confirm.lower() != "y":
+        print("Aborting.")
+        return
+
+    # Define the path to the config file
     config_file = Path.home() / ".swiftsim-utils" / "config.yaml"
+
+    # Delete the config file if it exists
     if config_file.exists():
         config_file.unlink()
+
+    print("All SWIFT-CLI profiles cleared.")
     _load_swift_config.cache_clear()
 
 
