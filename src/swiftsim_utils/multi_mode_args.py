@@ -5,8 +5,8 @@ import sys
 from pathlib import Path
 from typing import List, Sequence, Tuple
 
-from swiftsim_utils.config import load_swift_config
 from swiftsim_utils.modes import AVAILABLE_MODES, MODE_MODULES, Mode
+from swiftsim_utils.profile import load_swift_profile
 
 
 class MultiModeCLIArgs:
@@ -54,7 +54,7 @@ class MultiModeCLIArgs:
         parser.add_argument("-v", "--verbose", action="store_true")
 
         # Get the config for defaults
-        config = load_swift_config()
+        config = load_swift_profile()
         swift_dir = config.swiftsim_dir if config else None
         data_dir = config.data_dir if config else None
 

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from swiftsim_utils.config import load_swift_config
+from swiftsim_utils.profile import load_swift_profile
 from swiftsim_utils.utilities import run_command_in_dir
 
 
@@ -22,7 +22,7 @@ def get_swiftsim_dir(swift_dir: Path | None = None) -> Path:
         ValueError: If the SWIFT directory is not set in the configuration.
     """
     # Load the SWIFT configuration
-    config = load_swift_config()
+    config = load_swift_profile()
 
     # If we haven't been given a SWIFT directory, use the one from the config
     if swift_dir is None:

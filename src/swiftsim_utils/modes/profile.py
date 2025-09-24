@@ -7,15 +7,13 @@ from pathlib import Path
 import yaml
 
 from swiftsim_utils.profile import (
+    PROFILE_FILE,
     _load_all_profiles,
     _load_swift_profile,
     _save_swift_profile,
     get_cli_profiles,
 )
 from swiftsim_utils.utilities import ascii_art, create_ascii_table
-
-# Define the path to the profile file
-PROFILE_FILE = Path.home() / ".swiftsim-utils" / "profiles.yaml"
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -191,8 +189,16 @@ def new_profile(key: str) -> None:
     if key in exiting_profiles:
         raise ValueError(f"Profile '{key}' already exists.")
 
+    # Unpack the default profile to use as defaults
+    default_profile = exiting_profiles.get("Default", {})
+    default_swift = default_profile.get("swiftsim_dir", None)
+    default_data = default_profile.get("data_dir", None)
+
     # Otherwise, get the new profile and save it
-    profile = get_cli_profiles()
+    profile = get_cli_profiles(
+        default_swift=default_swift,
+        default_data=default_data,
+    )
     _save_swift_profile(profile, key)
 
 
