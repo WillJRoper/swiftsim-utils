@@ -12,7 +12,7 @@ from swiftsim_utils.config import (
     _save_swift_config,
     get_cli_configuration,
 )
-from swiftsim_utils.utilities import ascii_art
+from swiftsim_utils.utilities import ascii_art, create_ascii_table
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -227,13 +227,13 @@ def display_config() -> None:
     config = _load_swift_config()
 
     # Print the config values in a nice table format
-    head = f"{'Key':<20} | {'Value'}"
-    print(head)
-    print("-" * len(head))
+    headers = ["Key", "Value"]
+    rows = []
     for field in asdict(config).keys():
         value = getattr(config, field)
-        print(f"{field:<20} | {value}")
-    print()
+        rows.append([field, str(value)])
+
+    print(create_ascii_table(headers, rows, "CURRENT PROFILE"))
 
 
 def list_configs() -> None:
