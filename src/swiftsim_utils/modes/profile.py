@@ -265,5 +265,8 @@ def list_profiles() -> None:
         print("No profiles found.")
     else:
         for profile in profiles.keys():
+            # Skip Current
+            if profile == "Current":
+                continue
             print(f" - {profile}")
     print()
