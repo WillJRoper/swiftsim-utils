@@ -101,6 +101,16 @@ def get_cli_profiles(
       - Enter submits only when the completion menu is not open.
     Other prompts behave normally and submit on Enter.
     """
+    # Ensure all inputs are either str or None
+    default_swift = (
+        default_swift if default_swift is None else str(default_swift)
+    )
+    default_data = default_data if default_data is None else str(default_data)
+    default_branch = str(default_branch)
+    default_softening_coeff = str(default_softening_coeff)
+    default_softening_pivot_z = str(default_softening_pivot_z)
+
+    # Path completer for directory paths
     path_completer = PathCompleter(expanduser=True, only_directories=True)
 
     # Separate sessions so completers/validators do not leak.

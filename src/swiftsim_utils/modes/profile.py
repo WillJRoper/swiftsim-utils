@@ -85,9 +85,9 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--edit",
         "-e",
-        action="store_true",
-        help="Interactively edit the current profile.",
-        default=False,
+        help="Edit a profile. If no name is given, edits the current profile.",
+        type=str,
+        default="Current",
     )
 
 
@@ -104,7 +104,7 @@ def run(args: argparse.Namespace) -> None:
     elif args.switch is not None:
         switch_profile(args.switch)
     elif args.edit:
-        edit_current_profile()
+        edit_profile(args.edit)
     if args.show:
         display_profile()
     if args.list:
@@ -283,29 +283,26 @@ def list_profiles() -> None:
     print()
 
 
-def edit_current_profile() -> None:
-    """Edit the current SWIFT-utils profile interactively."""
-    current_profile = _load_swift_profile()
-    print(
-        "Editing current SWIFT-utils profile. "
-        "Press Enter to keep existing values.\n"
-    )
+def edit_profile(key: str) -> None:
+    """Edit the a SWIFT-utils profile interactively.
+
+    Args:
+        key: The key of the profile to edit.
+    """
+    profile = _load_swift_profile(key)
+    print(f"Editing profile '{key}'. Press Enter to keep existing values.\n")
     updated_profile = get_cli_profiles(
-        default_swift=str(current_profile.swiftsim_dir)
-        if current_profile.swiftsim_dir
+        default_swift=str(profile.swiftsim_dir)
+        if profile.swiftsim_dir
         else None,
-        default_data=str(current_profile.data_dir)
-        if current_profile.data_dir
-        else None,
-        default_branch=current_profile.branch
-        if current_profile.branch
-        else "master",
-        default_softening_coeff=current_profile.softening_coeff
-        if current_profile.softening_coeff
+        default_data=str(profile.data_dir) if profile.data_dir else None,
+        default_branch=profile.branch if profile.branch else "master",
+        default_softening_coeff=profile.softening_coeff
+        if profile.softening_coeff
         else 0.04,
-        default_softening_pivot_z=current_profile.softening_pivot_z
-        if current_profile.softening_pivot_z
+        default_softening_pivot_z=profile.softening_pivot_z
+        if profile.softening_pivot_z
         else 2.7,
     )
-    _save_swift_profile(updated_profile, key="Current")
+    _save_swift_profile(updated_profile, key=key)
     print("\nProfile updated successfully.")
