@@ -85,9 +85,9 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--edit",
         "-e",
-        help="Edit a profile. If no name is given, edits the current profile.",
+        help="Edit a profile.",
         type=str,
-        default="Current",
+        default=None,
     )
 
 
@@ -103,7 +103,7 @@ def run(args: argparse.Namespace) -> None:
         new_profile(args.new)
     elif args.switch is not None:
         switch_profile(args.switch)
-    elif args.edit:
+    elif args.edit is not None:
         edit_profile(args.edit)
     if args.show:
         display_profile()
