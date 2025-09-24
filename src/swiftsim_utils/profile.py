@@ -89,6 +89,9 @@ def _(event):
 def get_cli_profiles(
     default_swift: str | None = None,
     default_data: str | None = None,
+    default_branch: str = "master",
+    default_softening_coeff: float = 0.04,
+    default_softening_pivot_z: float = 2.7,
 ) -> SWIFTCLIProfile:
     """Interactively collect profile values for SWIFT-utils.
 
@@ -133,7 +136,7 @@ def get_cli_profiles(
     # --- Plain prompts (no completer) ---
     swift_branch = text_session.prompt(
         [("class:prompt", "SWIFTSim branch: ")],
-        default="master",
+        default=default_branch,
     ).strip()
 
     softening_coeff = text_session.prompt(
@@ -143,7 +146,7 @@ def get_cli_profiles(
                 "Softening coefficient in epsilon = x * mean_separation (default x=0.04): ",
             )
         ],
-        default="0.04",
+        default=default_softening_coeff,
     ).strip()
 
     softening_pivot_z = text_session.prompt(
@@ -153,7 +156,7 @@ def get_cli_profiles(
                 "Softening pivot redshift (used to calculate maximal softening lengths, default z=2.7): ",
             )
         ],
-        default="2.7",
+        default=default_softening_pivot_z,
     ).strip()
 
     # Convert to absolute paths
