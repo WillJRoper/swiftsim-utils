@@ -214,14 +214,23 @@ def switch_config(key: str) -> None:
     config = _load_swift_config(key)
     _save_swift_config(config, "Current")
 
+    # Report that we've switched and print the config
+    print("Switched to:")
+    display_config(print_header=False, title=f"PROFILE: {key}")
 
-def display_config() -> None:
-    """Display the current SWIFT-utils configuration."""
+
+def display_config(print_header: bool = True, title:str="CURRENT PROFILE) -> None:
+    """Display the current SWIFT-utils profile.
+
+    Args:
+        print_header: Whether to print the ASCII art header.
+    """
     # Print a header
-    print()
-    print("\n".join(ascii_art))
-    print()
-    print(" Current SWIFT-utils configuration:\n")
+    if print_header:
+        print()
+        print("\n".join(ascii_art))
+        print()
+        print(" Current SWIFT-utils profile:\n")
 
     # Get the current config
     config = _load_swift_config()
@@ -233,7 +242,7 @@ def display_config() -> None:
         value = getattr(config, field)
         rows.append([field, str(value)])
 
-    print(create_ascii_table(headers, rows, "CURRENT PROFILE"))
+    print(create_ascii_table(headers, rows, title=title))
 
 
 def list_configs() -> None:
