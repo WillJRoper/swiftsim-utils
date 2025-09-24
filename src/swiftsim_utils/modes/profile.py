@@ -219,11 +219,15 @@ def switch_config(key: str) -> None:
     display_config(print_header=False, title=f"PROFILE: {key}")
 
 
-def display_config(print_header: bool = True, title:str="CURRENT PROFILE) -> None:
+def display_config(
+    print_header: bool = True,
+    title: str = "CURRENT PROFILE",
+) -> None:
     """Display the current SWIFT-utils profile.
 
     Args:
         print_header: Whether to print the ASCII art header.
+        title: Title to display above the profile table.
     """
     # Print a header
     if print_header:
