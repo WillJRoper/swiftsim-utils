@@ -11,7 +11,7 @@ from prompt_toolkit.validation import ValidationError, Validator
 
 
 @dataclass()
-class SwiftCLIConfig:
+class SWIFTCLIProfile:
     """Configuration for SWIFT-utils.
 
     Attributes:
@@ -42,7 +42,7 @@ class PathExistsValidator(Validator):
 def get_cli_configuration(
     default_swift: str | None = None,
     default_data: str | None = None,
-) -> SwiftCLIConfig:
+) -> SWIFTCLIProfile:
     """Interactively collect config values for SWIFT-utils.
 
     Args:
@@ -50,7 +50,7 @@ def get_cli_configuration(
         default_data: Optional default data directory.
 
     Returns:
-        SwiftCLIConfig: Collected configuration.
+        SWIFTCLIProfile: Collected configuration.
     """
     path_completer = PathCompleter(expanduser=True, only_directories=True)
 
@@ -90,7 +90,7 @@ def get_cli_configuration(
     swift_repo = Path(swift_repo).expanduser().resolve()
     data_dir = Path(data_dir).expanduser().resolve()
 
-    return SwiftCLIConfig(
+    return SWIFTCLIProfile(
         Path(swift_repo).expanduser(),
         Path(data_dir).expanduser(),
         swift_branch,
@@ -100,25 +100,25 @@ def get_cli_configuration(
 
 
 @lru_cache(maxsize=None)
-def _load_swift_config(key=None) -> SwiftCLIConfig:
+def _load_swift_config(key=None) -> SWIFTCLIProfile:
     """Load the SWIFT-utils configuration from the config file.
 
     Returns:
-        SwiftCLIConfig: The loaded configuration.
+        SWIFTCLIProfile: The loaded configuration.
     """
     # Define the path to the config file
     config_file = Path.home() / ".swiftsim-utils" / "config.yaml"
 
     # Return a dummy if the config file does not yet exist
     if not config_file.exists():
-        return SwiftCLIConfig(None, None, 0.04, 2.7)
+        return SWIFTCLIProfile(None, None, 0.04, 2.7)
 
     with open(config_file, "r") as f:
         config_data = yaml.safe_load(f)
 
     # If we don't have a config yet return an empty one
     if config_data is None:
-        return SwiftCLIConfig(None, None, 0.04, 2.7)
+        return SWIFTCLIProfile(None, None, 0.04, 2.7)
 
     # If key is None return the current config
     if key is None:
@@ -126,7 +126,7 @@ def _load_swift_config(key=None) -> SwiftCLIConfig:
     else:
         config_data = config_data.get(key, {})
 
-    return SwiftCLIConfig(
+    return SWIFTCLIProfile(
         Path(config_data["swiftsim_dir"]),
         Path(config_data["data_dir"]),
         config_data.get("branch", "master"),
@@ -157,19 +157,19 @@ def _load_all_profiles() -> dict[str, dict]:
     return all_config_data
 
 
-def load_swift_config() -> SwiftCLIConfig:
+def load_swift_config() -> SWIFTCLIProfile:
     """Load the SWIFT-utils configuration.
 
     This function caches the result to avoid reloading the configuration
     multiple times.
 
     Returns:
-        SwiftCLIConfig: The loaded configuration.
+        SWIFTCLIProfile: The loaded configuration.
     """
     return _load_swift_config()
 
 
-def _save_swift_config(config: SwiftCLIConfig, key: str = "Current") -> None:
+def _save_swift_config(config: SWIFTCLIProfile, key: str = "Current") -> None:
     """Save the SWIFT-utils configuration to the config file.
 
     Args:
