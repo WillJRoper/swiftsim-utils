@@ -64,7 +64,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "-p",
         type=str,
         help="A prefix to add to the analysis files (default: '').",
-        default="",
+        default=None,
     )
 
     timestep_parser.add_argument(
@@ -334,7 +334,6 @@ def analyse_timestep_files(
     Raises:
         ValueError: If the number of files and labels do not match.
     """
-    print(prefix)
     # Make sure the number of files and labels match
     if len(files) != len(labels):
         raise ValueError("Number of files and labels must match.")

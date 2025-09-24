@@ -3,7 +3,11 @@
 import argparse
 from pathlib import Path
 
-from swiftsim_utils.swiftsim_dir import get_swiftsim_dir, _run_command_in_swift_dir
+from swiftsim_utils.profile import update_current_profile_value
+from swiftsim_utils.swiftsim_dir import (
+    _run_command_in_swift_dir,
+    get_swiftsim_dir,
+)
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -44,3 +48,6 @@ def switch_swift_branch(branch: str, swift_dir: Path | None = None) -> None:
 
     # Run the command in the SWIFT directory
     _run_command_in_swift_dir(f"git checkout {branch}", swift_dir)
+
+    # Update the current config
+    update_current_profile_value("branch", branch)

@@ -3,6 +3,14 @@
 import os
 from pathlib import Path
 
+ascii_art = (
+    r"    ______       _________________        _______   ____",
+    r"   / ___/ |     / /  _/ ___/_  __/ ____  / ___/ /  /  _/",
+    r"   \__ \| | /| / // // /_   / /   /___/ / /  / /   / /",
+    r"  ___/ /| |/ |/ // // __/  / /         / /__/ /__ / /",
+    r" /____/ |__/|__/___/_/    /_/         /____/____/___/",
+)
+
 
 def run_command_in_dir(command: str, directory: Path) -> None:
     """Run a command in a specified directory.

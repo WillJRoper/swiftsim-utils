@@ -8,7 +8,7 @@ from typing import Tuple
 import h5py
 from ruamel.yaml import YAML
 
-from swiftsim_utils.config import load_swift_config
+from swiftsim_utils.profile import load_swift_profile
 from swiftsim_utils.swiftsim_dir import get_swiftsim_dir
 
 # Configure YAML for round-trip comment preservation and consistent formatting
@@ -86,7 +86,7 @@ def derive_params_from_ics(
         dict: The updated parameters dictionary with derived values.
     """
     # Get the config
-    config = load_swift_config()
+    config = load_swift_profile()
 
     # Ensure the initial conditions file exists
     if not inicond_file.exists():
