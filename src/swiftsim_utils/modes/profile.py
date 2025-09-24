@@ -14,6 +14,9 @@ from swiftsim_utils.profile import (
 )
 from swiftsim_utils.utilities import ascii_art, create_ascii_table
 
+# Define the path to the profile file
+PROFILE_FILE = Path.home() / ".swiftsim-utils" / "profiles.yaml"
+
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Add arguments for the profile mode."""
@@ -108,15 +111,12 @@ def initial_profile_profile() -> None:
     print("Let's set up your profile...\n")
     print()
 
-    # Define the path to the profile file
-    profile_file = Path.home() / ".swiftsim-utils" / "profiles.yaml"
-
     # Ensure the directory exists
-    profile_file.parent.mkdir(parents=True, exist_ok=True)
+    PROFILE_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     # If the profile file already exists, load it to use as defaults
-    if profile_file.exists():
-        with open(profile_file, "r") as f:
+    if PROFILE_FILE.exists():
+        with open(PROFILE_FILE, "r") as f:
             profile_data = yaml.safe_load(f)
         if profile_data is None:  # Handle case where the file is empty
             profile_data = {}
@@ -126,7 +126,7 @@ def initial_profile_profile() -> None:
         default_swift = None
         default_data = None
 
-    # Collect profileuration interactively
+    # Collect profiles
     profiles = get_cli_profiles(
         default_swift=default_swift,
         default_data=default_data,
@@ -140,20 +140,20 @@ def initial_profile_profile() -> None:
         if isinstance(v, Path):
             data[k] = str(v)
 
-    # Save the profileuration under a name and also store it as the current
+    # Save the profile under a name and also store it as the current
     profile = {"Current": data, "Default": data}
 
-    # Write the profileuration to the YAML file
-    with open(profile_file, "w") as f:
+    # Write the profile to the YAML file
+    with open(PROFILE_FILE, "w") as f:
         yaml.dump(profile, f, default_flow_style=False)
 
-    print("profileuration saved to", profile_file)
+    print("Profile saved to", PROFILE_FILE)
 
 
 def clear_swift_profile() -> None:
-    """Clear the SWIFT-utils profileuration.
+    """Clear the SWIFT-utils profiles.
 
-    This will delete the profileuration file if it exists.
+    This will delete the profiles file if it exists.
     """
     # Make sure the user is sure they want to do this
     confirm = input(
@@ -161,31 +161,28 @@ def clear_swift_profile() -> None:
         " This action cannot be undone. (y/N): "
     )
     if confirm.lower() != "y":
-        print("Aborting.")
+        print("Aborting...")
         return
 
-    # Define the path to the profile file
-    profile_file = Path.home() / ".swiftsim-utils" / "profile.yaml"
-
     # Delete the profile file if it exists
-    if profile_file.exists():
-        profile_file.unlink()
+    if PROFILE_FILE.exists():
+        PROFILE_FILE.unlink()
 
     print("All SWIFT-CLI profiles cleared.")
     _load_swift_profile.cache_clear()
 
 
 def save_current_profile_as_default() -> None:
-    """Save the current profileuration as the default profileuration."""
+    """Save the current profile as the default profile."""
     profile = _load_swift_profile()
     _save_swift_profile(profile, "Default")
 
 
 def new_profile(key: str) -> None:
-    """Create a new profileuration with the given key.
+    """Create a new profile with the given key.
 
     Args:
-        key: The key under which to save the new profileuration.
+        key: The key under which to save the new profile.
     """
     # Ensure the key exists and is not already in the profile
     exiting_profiles = _load_all_profiles()
@@ -195,15 +192,15 @@ def new_profile(key: str) -> None:
         raise ValueError(f"Profile '{key}' already exists.")
 
     # Otherwise, get the new profile and save it
-    profile = get_cli_profileuration()
+    profile = get_cli_profiles()
     _save_swift_profile(profile, key)
 
 
 def switch_profile(key: str) -> None:
-    """Switch the current profileuration to the one with the given key.
+    """Switch the current profile to the one with the given key.
 
     Args:
-        key: The key of the profileuration to switch to.
+        key: The key of the profile to switch to.
     """
     # Make sure the key exists
     exiting_profiles = _load_all_profiles()
