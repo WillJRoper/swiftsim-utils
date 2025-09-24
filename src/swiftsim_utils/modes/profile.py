@@ -81,6 +81,15 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         default=False,
     )
 
+    # Edit the current profile
+    parser.add_argument(
+        "--edit",
+        "-e",
+        help="Edit a profile. If no name is given, edits the current profile.",
+        type=str,
+        default="Current",
+    )
+
 
 def run(args: argparse.Namespace) -> None:
     """Execute the init mode."""
@@ -94,6 +103,8 @@ def run(args: argparse.Namespace) -> None:
         new_profile(args.new)
     elif args.switch is not None:
         switch_profile(args.switch)
+    elif args.edit:
+        edit_profile(args.edit)
     if args.show:
         display_profile()
     if args.list:
@@ -270,3 +281,28 @@ def list_profiles() -> None:
                 continue
             print(f" - {profile}")
     print()
+
+
+def edit_profile(key: str) -> None:
+    """Edit the a SWIFT-utils profile interactively.
+
+    Args:
+        key: The key of the profile to edit.
+    """
+    profile = _load_swift_profile(key)
+    print(f"Editing profile '{key}'. Press Enter to keep existing values.\n")
+    updated_profile = get_cli_profiles(
+        default_swift=str(profile.swiftsim_dir)
+        if profile.swiftsim_dir
+        else None,
+        default_data=str(profile.data_dir) if profile.data_dir else None,
+        default_branch=profile.branch if profile.branch else "master",
+        default_softening_coeff=profile.softening_coeff
+        if profile.softening_coeff
+        else 0.04,
+        default_softening_pivot_z=profile.softening_pivot_z
+        if profile.softening_pivot_z
+        else 2.7,
+    )
+    _save_swift_profile(updated_profile, key=key)
+    print("\nProfile updated successfully.")
