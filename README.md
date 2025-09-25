@@ -118,7 +118,7 @@ e.g. for the analyse mode:
 swift-cli analyse --help
 ```
 
-yields:
+Which yields:
 
 ```bash
 usage: swift-cli analyse [-h] {timesteps,gravity-checks,gravity-error-map,log} ...
