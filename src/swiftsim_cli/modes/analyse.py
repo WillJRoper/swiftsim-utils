@@ -241,7 +241,8 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     log_parser.add_argument(
         "--top-n",
         type=int,
-        help="Number of top functions to show in detailed plots (default: 20).",
+        help="Number of top functions to show in detailed plots "
+        "(default: 20).",
         default=20,
     )
 
@@ -831,6 +832,7 @@ def analyse_gravity_error_maps(
             If empty, defaults to 'gravity_error_map.png'.
         show_plot: Whether to display the plot.
         resolution: Resolution (gridsize) for hexbin plot (default: 100).
+        error_thresh: Error threshold for hexbin color scale (default: 1e-2).
 
     Raises:
         ValueError: If the number of files and labels do not match.
@@ -1105,7 +1107,6 @@ def analyse_swift_log_timings(
 
     # Read and parse the log file
     with open(log_file, "r") as f:
-        current_step = None
         current_task_times = {}
 
         for line in f:
@@ -1120,7 +1121,6 @@ def analyse_swift_log_timings(
             if step_match:
                 try:
                     step_num = int(step_match.group(1))
-                    current_step = step_num
                     step_info.append(
                         {
                             "step": step_num,
@@ -1805,7 +1805,8 @@ def analyse_swift_log_timings(
     print(f"Total logged function time: {total_time:.1f} ms")
     print(f"Total unique functions: {len(function_stats)}")
     print(
-        f"Total function calls: {sum(stats['call_count'] for stats in function_stats.values())}"
+        "Total function calls: "
+        f"{sum(stats['call_count'] for stats in function_stats.values())}"
     )
     print(f"Steps processed: {len(step_info)}")
 
@@ -1828,7 +1829,8 @@ def analyse_swift_log_timings(
             (top_10_time / total_time * 100) if total_time > 0 else 0
         )
         print(
-            f"Top 10 functions account for: {top_10_percent:.1f}% of total time"
+            "Top 10 functions account for: "
+            f"{top_10_percent:.1f}% of total time"
         )
     if task_counts:
         total_tasks_all_steps = sum(
@@ -1842,5 +1844,6 @@ def analyse_swift_log_timings(
                 task_counts.items(), key=lambda x: sum(x[1])
             )
             print(
-                f"Most common task type: {most_common_task[0]} ({sum(most_common_task[1])} total)"
+                "Most common task type: "
+                f"{most_common_task[0]} ({sum(most_common_task[1])} total)"
             )
