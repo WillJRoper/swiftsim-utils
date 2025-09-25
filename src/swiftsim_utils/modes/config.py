@@ -19,16 +19,101 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Show the available configuration options.",
     )
+    parser.add_argument(
+        "--debug",
+        "-d",
+        action="store_true",
+        help="Configure using the preset debug options "
+        "(--enable-debug --enable-debugging-checks --disable-optimization).",
+    )
+    parser.add_argument(
+        "--gravity",
+        "-g",
+        action="store_true",
+        help="Configure using the preset gravity-only options "
+        "(--enable-ipo --with-tbbmalloc --with-parmetis).",
+    )
+    parser.add_argument(
+        "--eagle",
+        "-e",
+        action="store_true",
+        help="Configure using the preset EAGLE options "
+        "(--with-subgrid=EAGLE --with-hydro=sphenix --with-kernel=wendland-C2 "
+        "--enable-ipo --with-tbbmalloc  --with-parmetis).",
+    )
+    parser.add_argument(
+        "--eaglexl",
+        "-x",
+        action="store_true",
+        help="Configure using the preset EAGLE-XL options "
+        "(--with-subgrid=EAGLE-XL --with-hydro=sphenix "
+        "--with-kernel=wendland-C2 --enable-ipo --with-tbbmalloc "
+        "--with-parmetis).",
+    )
 
 
 def run(args: argparse.Namespace) -> None:
-    """Execute the config mode."""
+    """Execute the config mode.
+
+    Note that the user can very readily pass incorrectly formed options. We let
+    SWIFT itself handle that, as it will give a useful error message.
+
+    Args:
+        args: The parsed arguments from the command line.
+    """
     # Are we just showing the config options?
     if args.show:
         show_config_options(args.swift_dir)
     else:
+        # Build up the options to pass to the configure script
+        opts = []
+        if args.debug:
+            opts.extend(
+                [
+                    "--enable-debug",
+                    "--enable-debugging-checks",
+                    "--disable-optimization",
+                ]
+            )
+        if args.gravity:
+            opts.extend(
+                [
+                    "--enable-ipo",
+                    "--with-tbbmalloc",
+                    "--with-parmetis",
+                ]
+            )
+        if args.eagle:
+            opts.extend(
+                [
+                    "--with-subgrid=EAGLE",
+                    "--with-hydro=sphenix",
+                    "--with-kernel=wendland-C2",
+                    "--enable-ipo",
+                    "--with-tbbmalloc",
+                    "--with-parmetis",
+                ]
+            )
+        if args.eaglexl:
+            opts.extend(
+                [
+                    "--with-subgrid=EAGLE-XL",
+                    "--with-hydro=sphenix",
+                    "--with-kernel=wendland-C2",
+                    "--enable-ipo",
+                    "--with-tbbmalloc",
+                    "--with-parmetis",
+                ]
+            )
+        opts.extend(args.options)
+
+        # Remove any duplicate options while preserving order
+        seen = set()
+        args.options = [x for x in opts if not (x in seen or seen.add(x))]
+
+        # Now run the configuration
         config_swiftsim(
-            opts=" ".join(args.options),
+            opts=" ".join(opts),
             swift_dir=args.swift_dir,
         )
 
