@@ -107,7 +107,7 @@ docs = [
 
 # Entry points
 [project.scripts]
-swift-cli="swiftsim_utils.cli:main"
+swift-cli="swiftsim_cli.cli:main"
 
 # Set up the build system
 [build-system]
@@ -120,7 +120,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 
 # Make a version file at build time
-version_file = "src/swiftsim_utils/_version.py"
+version_file = "src/swiftsim_cli/_version.py"
 
 # Configure the linter and formatter
 [tool.ruff]
