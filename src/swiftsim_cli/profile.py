@@ -65,7 +65,7 @@ KB = KeyBindings()
 
 @KB.add("enter")
 def _(event):
-    """Enter accepts highlighted completion if menu is open, otherwise submits."""
+    """Enter accepts current completion if menu is open, otherwise submits."""
     buf = event.current_buffer
     if getattr(buf, "completer", None) is not None and buf.complete_state:
         comp = buf.complete_state.current_completion
@@ -77,7 +77,7 @@ def _(event):
 
 @KB.add("tab")
 def _(event):
-    """Tab opens/cycles completions only if the current prompt has a completer."""
+    """Tab opens/cycles completions, if the current prompt has a completer."""
     buf = event.current_buffer
     if getattr(buf, "completer", None) is not None:
         if buf.complete_state:
@@ -153,7 +153,7 @@ def get_cli_profiles(
         [
             (
                 "class:prompt",
-                "Softening coefficient in epsilon = x * mean_separation (default x=0.04): ",
+                "Softening (in units of mean separation): ",
             )
         ],
         default=default_softening_coeff,
@@ -163,7 +163,7 @@ def get_cli_profiles(
         [
             (
                 "class:prompt",
-                "Softening pivot redshift (used to calculate maximal softening lengths, default z=2.7): ",
+                "Maximal softening pivot redshift: ",
             )
         ],
         default=default_softening_pivot_z,

@@ -1,8 +1,9 @@
 """Output-times mode for generating output time lists."""
 
 import argparse
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 
 from swiftsim_cli.cosmology import (
     convert_redshift_to_scale_factor,

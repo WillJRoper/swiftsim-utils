@@ -3,7 +3,10 @@
 import argparse
 from pathlib import Path
 
-from swiftsim_cli.swiftsim_dir import get_swiftsim_dir, _run_command_in_swift_dir
+from swiftsim_cli.swiftsim_dir import (
+    _run_command_in_swift_dir,
+    get_swiftsim_dir,
+)
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
