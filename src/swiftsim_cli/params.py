@@ -4,8 +4,6 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
-PARAMS: dict | None = None
-
 # Configure YAML for round-trip comment preservation and consistent formatting
 yaml = YAML()
 yaml.default_flow_style = False
@@ -73,16 +71,25 @@ def load_parameters(param_file: Path | None = None) -> dict:
         IOError:           If the file cannot be read.
         ValueError:        If parsing fails.
     """
-    global PARAMS
+    # Avoid circular import
+    from swiftsim_cli.profile import load_swift_profile
 
-    if PARAMS is not None:
-        return PARAMS
-
+    # If we haven't been passed a path, get the parameter file path from the
+    # profile
     if param_file is None:
-        return {}
+        profile = load_swift_profile()
+        param_file = getattr(profile, "template_params", None)
+        if param_file is None:
+            raise ValueError(
+                "No parameter file specified and no default set in profile."
+            )
 
+    # Ensure we have a Path object
+    if not isinstance(param_file, Path):
+        param_file = Path(param_file)
+
+    # Ensure the path exists
     if not param_file.exists():
         raise FileNotFoundError(f"Parameter file not found: {param_file}")
 
-    PARAMS = _parse_parameters(param_file)
-    return PARAMS
+    return _parse_parameters(param_file)

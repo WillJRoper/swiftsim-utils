@@ -11,6 +11,8 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
 from prompt_toolkit.validation import ValidationError, Validator
 
+from swiftsim_cli.params import load_parameters
+
 # Define the path to the profile file
 PROFILE_FILE = Path.home() / ".swiftsim-utils" / "profiles.yaml"
 
@@ -25,13 +27,59 @@ class SWIFTCLIProfile:
     Attributes:
         swiftsim_dir: Path to the SWIFTSim repository.
         data_dir: Path to the directory containing additional data files.
+        branch: The branch of the SWIFTSim repository to use.
+        template_params: The path to a template parameter file, if None
+            defaults to swiftsim_dir/examples/parameter_example.yml.
+        h: The Hubble parameter (optional).
+        Omega_cdm: The cold dark matter density parameter (optional).
+        Omega_b: The baryon density parameter (optional).
+        Omega_m: The total matter density parameter (optional).
+        Omega_Lambda: The dark energy density parameter (optional).
+        softening_coeff: The softening length in units of the mean
+            inter-particle separation.
+        softening_pivot_z: The pivot redshift for the softening length.
     """
 
     swiftsim_dir: Path
     data_dir: Path
     branch: str = "master"
+    template_params: Path = None
+    h: float = None
+    Omega_cdm: float = None
+    Omega_b: float = None
+    Omega_m: float = None
+    Omega_Lambda: float = None
     softening_coeff: float = 0.04
     softening_pivot_z: float = 2.7
+
+    def __post_init__(self):
+        """Post-initialization processing."""
+        # Ensure paths are Path objects
+        if self.swiftsim_dir is not None:
+            self.swiftsim_dir = Path(self.swiftsim_dir)
+        if self.data_dir is not None:
+            self.data_dir = Path(self.data_dir)
+        if self.template_params is not None:
+            self.template_params = Path(self.template_params)
+
+        # If the template_param is not set, default
+        # to swiftsim_dir/examples/parameter_example.yml
+        if (
+            self.template_params is None or str(self.template_params) == "."
+        ) and self.swiftsim_dir is not None:
+            self.template_params = (
+                self.swiftsim_dir / "examples" / "parameter_example.yml"
+            )
+
+        # Validate that the template_params file exists
+        if (
+            self.template_params is not None
+            and not self.template_params.exists()
+        ):
+            raise FileNotFoundError(
+                f"Template parameter file {self.template_params}"
+                " does not exist."
+            )
 
 
 class PathExistsValidator(Validator):
@@ -125,7 +173,9 @@ def get_cli_profiles(
         complete_while_typing=False,
     )
 
-    # --- Path prompts with validation and completion ---
+    print("\nFirst we need to collect some location information...\n")
+
+    # The SWIFT repo location
     swift_repo = path_session.prompt(
         [("class:prompt", "SWIFTSim directory: ")],
         default=(default_swift or ""),
@@ -134,21 +184,103 @@ def get_cli_profiles(
         validate_while_typing=False,
     ).strip()
 
+    # The directory where SWIFT will put extra data dependencies
     data_dir = path_session.prompt(
-        [("class:prompt", "Extra data directory: ")],
-        # preserve fallback: use default_data if provided, otherwise swift_repo
+        [("class:prompt", "SWIFT data directory: ")],
         default=(default_data or swift_repo),
         completer=path_completer,
         validator=PathExistsValidator(),
         validate_while_typing=False,
     ).strip()
 
-    # --- Plain prompts (no completer) ---
+    # The SWIFTSim branch to use
     swift_branch = text_session.prompt(
-        [("class:prompt", "SWIFTSim branch: ")],
+        [("class:prompt", "Which SWIFT git branch?: ")],
         default=default_branch,
     ).strip()
 
+    print(
+        "\nFor some operations we'll need a template SWIFT parameter file. "
+        "This will be used to extract default parameters and generate "
+        "parameter files for new simulations.\n"
+        "By default this will use the complete example parameter file that "
+        "comes with SWIFT.\n"
+    )
+
+    # An optional template parameter file path
+    template_params = path_session.prompt(
+        [
+            (
+                "class:prompt",
+                "Template parameter file: ",
+            )
+        ],
+        default=f"{swift_repo}/examples/parameter_example.yml",
+        completer=path_completer,
+        validator=PathExistsValidator(),
+        validate_while_typing=False,
+    ).strip()
+
+    # If the user entered an empty string, set to None
+    if template_params == "":
+        template_params = None
+
+    print(
+        "\nNext you can optionally customise the default cosmology "
+        "(by default these are taken from the template parameter file)\n"
+    )
+
+    # Get the cosmology parameters we just loaded to use as defaults
+    cosmo_params = load_parameters(template_params).get("Cosmology", {})
+
+    # Take missing defaults from D3A from Flamingo (Schaye et al. 2023)
+    if "h" not in cosmo_params:
+        cosmo_params["h"] = 0.681
+    if "Omega_cdm" not in cosmo_params:
+        cosmo_params["Omega_cdm"] = 0.2574
+    if "Omega_b" not in cosmo_params:
+        cosmo_params["Omega_b"] = 0.0486
+    if "Omega_m" not in cosmo_params:
+        cosmo_params["Omega_m"] = 0.306
+    if "Omega_Lambda" not in cosmo_params:
+        cosmo_params["Omega_lambda"] = 0.694
+
+    # The little-h (reduced Hubble parameter)
+    h = text_session.prompt(
+        [("class:prompt", "Default Hubble parameter: ")],
+        default=str(cosmo_params.get("h", "")),
+    ).strip()
+
+    # Omega_cdm
+    omega_cdm = text_session.prompt(
+        [("class:prompt", "Omega_cdm: ")],
+        default=str(cosmo_params.get("Omega_cdm", "")),
+    ).strip()
+
+    # Omega_b
+    omega_b = text_session.prompt(
+        [("class:prompt", "Omega_b: ")],
+        default=str(cosmo_params.get("Omega_b", "")),
+    ).strip()
+
+    # Omega_m
+    omega_m = text_session.prompt(
+        [("class:prompt", "Omega_m (Omega_b + Omega_cdm): ")],
+        default=str(cosmo_params.get("Omega_m", "")),
+    ).strip()
+
+    # Omega_Lambda
+    omega_lambda = text_session.prompt(
+        [("class:prompt", "Omega_Lambda: ")],
+        default=str(cosmo_params.get("Omega_lambda", "")),
+    ).strip()
+
+    print(
+        "\nFinally, we can customise the gravitational softening "
+        "definitions...\n"
+    )
+
+    # The softening length in units of the mean inter-particle separation
     softening_coeff = text_session.prompt(
         [
             (
@@ -159,6 +291,7 @@ def get_cli_profiles(
         default=default_softening_coeff,
     ).strip()
 
+    # The pivot redshift for the softening length
     softening_pivot_z = text_session.prompt(
         [
             (
@@ -172,11 +305,19 @@ def get_cli_profiles(
     # Convert to absolute paths
     swift_repo = Path(swift_repo).expanduser().resolve()
     data_dir = Path(data_dir).expanduser().resolve()
+    if template_params is not None:
+        template_params = Path(template_params).expanduser().resolve()
 
     return SWIFTCLIProfile(
         swift_repo,
         data_dir,
         swift_branch,
+        template_params,
+        float(h),
+        float(omega_cdm),
+        float(omega_b),
+        float(omega_m),
+        float(omega_lambda),
         float(softening_coeff),
         float(softening_pivot_z),
     )
@@ -191,14 +332,38 @@ def _load_swift_profile(key=None) -> SWIFTCLIProfile:
     """
     # Return a dummy if the profile file does not yet exist
     if not PROFILE_FILE.exists():
-        return SWIFTCLIProfile(None, None, 0.04, 2.7)
+        return SWIFTCLIProfile(
+            None,  # swiftsim_dir
+            None,  # data_dir
+            "master",  # branch
+            None,  # template_params
+            0.681,  # h from Flamingo (Schaye et al. 2023)
+            0.2574,  # Omega_cdm from Flamingo (Schaye et al. 2023)
+            0.0486,  # Omega_b from Flamingo (Schaye et al. 2023)
+            0.306,  # Omega_m from Flamingo (Schaye et al. 2023)
+            0.694,  # Omega_Lambda from Flamingo (Schaye et al. 2023)
+            0.04,  # softening_coeff
+            2.7,  # softening_pivot_z
+        )
 
     with open(PROFILE_FILE, "r") as f:
         profile_data = yaml.safe_load(f)
 
     # If we don't have a profile yet return an empty one
     if profile_data is None:
-        return SWIFTCLIProfile(None, None, 0.04, 2.7)
+        return SWIFTCLIProfile(
+            None,
+            None,
+            "master",
+            None,
+            0.681,
+            0.2574,
+            0.0486,
+            0.306,
+            0.694,
+            0.04,
+            2.7,
+        )
 
     # If key is None return the current profile
     if key is None:
@@ -210,6 +375,12 @@ def _load_swift_profile(key=None) -> SWIFTCLIProfile:
         Path(profile_data["swiftsim_dir"]),
         Path(profile_data["data_dir"]),
         profile_data.get("branch", "master"),
+        Path(profile_data.get("template_params", "")),
+        float(profile_data.get("h", 0.681)),
+        float(profile_data.get("Omega_cdm", 0.2574)),
+        float(profile_data.get("Omega_b", 0.0486)),
+        float(profile_data.get("Omega_m", 0.306)),
+        float(profile_data.get("Omega_Lambda", 0.694)),
         float(profile_data.get("softening_coeff", 0.04)),
         float(profile_data.get("softening_pivot_z", 2.7)),
     )

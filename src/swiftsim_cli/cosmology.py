@@ -1,6 +1,7 @@
 """A module defining machinery related to cosmology in SWIFT."""
 
 from functools import lru_cache
+from pathlib import Path
 
 import astropy.cosmology.core
 import astropy.units as u
@@ -9,7 +10,7 @@ from astropy.cosmology import FlatLambdaCDM, z_at_value
 from swiftsim_cli.params import load_parameters
 
 
-def _get_cosmology() -> FlatLambdaCDM:
+def _get_cosmology(path: Path = None) -> FlatLambdaCDM | None:
     """Get the cosmology parameters from the SWIFT configuration.
 
     Returns:
@@ -17,7 +18,7 @@ def _get_cosmology() -> FlatLambdaCDM:
         defined in the SWIFT configuration.
     """
     # Get the parameters
-    params = load_parameters()
+    params = load_parameters(path)
 
     # If we have no parameters we can't set up a cosmology
     if len(params) == 0:
@@ -37,15 +38,19 @@ def _get_cosmology() -> FlatLambdaCDM:
 
 
 @lru_cache(maxsize=1)
-def get_cosmology() -> FlatLambdaCDM | None:
+def get_cosmology(path: Path = None) -> FlatLambdaCDM | None:
     """Get the cached cosmology object.
 
     If no parameters are defined, this will return None.
 
+    Args:
+        path (Path, optional): The path to the SWIFT configuration file.
+            If None, the default configuration file will be used.
+
     Returns:
         FlatLambdaCDM: The cached cosmology object.
     """
-    return _get_cosmology()
+    return _get_cosmology(path)
 
 
 def convert_redshift_to_time(redshift: float) -> float:
