@@ -37,9 +37,6 @@ cd swiftsim-utils
 
 # Install in development mode with all dependencies
 pip install -e .
-
-# Install pre-commit hooks (optional, for development)
-pre-commit install
 ```
 
 ## Quick Start
