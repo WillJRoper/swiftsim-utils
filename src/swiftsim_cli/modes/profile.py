@@ -6,14 +6,14 @@ from pathlib import Path
 
 import yaml
 
-from swiftsim_utils.profile import (
+from swiftsim_cli.profile import (
     PROFILE_FILE,
     _load_all_profiles,
     _load_swift_profile,
     _save_swift_profile,
     get_cli_profiles,
 )
-from swiftsim_utils.utilities import ascii_art, create_ascii_table
+from swiftsim_cli.utilities import ascii_art, create_ascii_table
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:

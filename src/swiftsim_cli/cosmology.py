@@ -6,7 +6,7 @@ import astropy.cosmology.core
 import astropy.units as u
 from astropy.cosmology import FlatLambdaCDM, z_at_value
 
-from swiftsim_utils.params import load_parameters
+from swiftsim_cli.params import load_parameters
 
 
 def _get_cosmology() -> FlatLambdaCDM:

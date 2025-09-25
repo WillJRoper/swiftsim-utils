@@ -11,7 +11,7 @@ import numpy as np
 from matplotlib.colors import LogNorm
 from matplotlib.lines import Line2D
 
-from swiftsim_utils.utilities import create_ascii_table, create_output_path
+from swiftsim_cli.utilities import create_ascii_table, create_output_path
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:

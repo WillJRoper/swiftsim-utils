@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from swiftsim_utils.profile import load_swift_profile
-from swiftsim_utils.utilities import run_command_in_dir
+from swiftsim_cli.profile import load_swift_profile
+from swiftsim_cli.utilities import run_command_in_dir
 
 
 def get_swiftsim_dir(swift_dir: Path | None = None) -> Path:

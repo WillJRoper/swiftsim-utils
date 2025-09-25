@@ -157,7 +157,7 @@ ruff check --fix
 ruff format
 
 # Type checking
-mypy src/swiftsim_utils/
+mypy src/swiftsim_cli/
 
 # Run tests
 pytest
@@ -165,11 +165,11 @@ pytest
 
 ### Project Structure
 
-- `src/swiftsim_utils/cli.py`: Main CLI entry point
-- `src/swiftsim_utils/modes/`: Individual command mode implementations
-- `src/swiftsim_utils/multi_mode_args.py`: Multi-mode argument parsing
-- `src/swiftsim_utils/profile.py`: Configuration management
-- `src/swiftsim_utils/swiftsim_dir.py`: SWIFT repository utilities
+- `src/swiftsim_cli/cli.py`: Main CLI entry point
+- `src/swiftsim_cli/modes/`: Individual command mode implementations
+- `src/swiftsim_cli/multi_mode_args.py`: Multi-mode argument parsing
+- `src/swiftsim_cli/profile.py`: Configuration management
+- `src/swiftsim_cli/swiftsim_dir.py`: SWIFT repository utilities
 
 ## Contributing
 
@@ -192,7 +192,7 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 If you use swiftsim-utils in your research, please cite:
 
 ```bibtex
-@software{swiftsim_utils,
+@software{swiftsim_cli,
   author = {Roper, W. J.},
   title = {swiftsim-utils: A CLI tool for SWIFT simulations},
   url = {https://github.com/WillJRoper/swiftsim-utils},

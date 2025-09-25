@@ -1,9 +1,9 @@
 """The main module containing the swiftsim-utils CLI tool."""
 
-from swiftsim_utils.modes import MODE_MODULES
-from swiftsim_utils.multi_mode_args import MultiModeCLIArgs
-from swiftsim_utils.params import load_parameters
-from swiftsim_utils.profile import load_swift_profile
+from swiftsim_cli.modes import MODE_MODULES
+from swiftsim_cli.multi_mode_args import MultiModeCLIArgs
+from swiftsim_cli.params import load_parameters
+from swiftsim_cli.profile import load_swift_profile
 
 
 def main(argv: list[str] | None = None) -> None:

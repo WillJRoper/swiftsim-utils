@@ -8,8 +8,8 @@ from typing import Tuple
 import h5py
 from ruamel.yaml import YAML
 
-from swiftsim_utils.profile import load_swift_profile
-from swiftsim_utils.swiftsim_dir import get_swiftsim_dir
+from swiftsim_cli.profile import load_swift_profile
+from swiftsim_cli.swiftsim_dir import get_swiftsim_dir
 
 # Configure YAML for round-trip comment preservation and consistent formatting
 yaml = YAML()

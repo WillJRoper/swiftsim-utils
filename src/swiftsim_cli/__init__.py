@@ -1,3 +1,3 @@
 """"""
 
-from swiftsim_utils._version import __version__
+from swiftsim_cli._version import __version__

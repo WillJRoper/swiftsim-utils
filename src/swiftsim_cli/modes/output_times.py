@@ -4,14 +4,14 @@ import argparse
 import numpy as np
 from pathlib import Path
 
-from swiftsim_utils.cosmology import (
+from swiftsim_cli.cosmology import (
     convert_redshift_to_scale_factor,
     convert_redshift_to_time,
     convert_scale_factor_to_redshift,
     convert_time_to_redshift,
     get_cosmology,
 )
-from swiftsim_utils.params import load_parameters
+from swiftsim_cli.params import load_parameters
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:

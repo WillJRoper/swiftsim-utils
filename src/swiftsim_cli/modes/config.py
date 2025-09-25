@@ -3,7 +3,7 @@
 import argparse
 from pathlib import Path
 
-from swiftsim_utils.swiftsim_dir import (
+from swiftsim_cli.swiftsim_dir import (
     _run_command_in_swift_dir,
     get_swiftsim_dir,
 )
