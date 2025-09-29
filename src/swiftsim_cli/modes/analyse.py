@@ -1141,12 +1141,12 @@ def analyse_swift_log_timings(
             # Extract function timing information
             timing_match = re.search(
                 r"\[\d+\.\d+\]\s+([^:]+: .*?|[^\s:]+)\s*:"
-                r"?\s+took\s+([\d.]+)\s+ms\.?"
+                r"?\s+took\s+([\d.]+)\s+ms\.?",
+                line,
             )
             if timing_match:
                 func_name = timing_match.group(1).strip()
                 time_ms = float(timing_match.group(2))
-                print(func_name, time_ms)
                 function_times[func_name].append(time_ms)
                 function_calls[func_name] += 1
                 continue
