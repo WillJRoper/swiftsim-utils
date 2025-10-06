@@ -1,5 +1,6 @@
 """Unit tests for utility functions."""
 
+from subprocess import CalledProcessError, TimeoutExpired
 from unittest.mock import Mock, patch
 
 import pytest
@@ -122,8 +123,6 @@ class TestUtilityFunctions:
     @patch("subprocess.run")
     def test_run_command_in_dir_failure(self, mock_run, temp_dir):
         """Test running command that fails."""
-        from subprocess import CalledProcessError
-
         mock_run.side_effect = CalledProcessError(1, "fake_command")
 
         with pytest.raises(CalledProcessError):
@@ -260,8 +259,6 @@ class TestUtilityEdgeCases:
     @patch("subprocess.run")
     def test_run_command_in_dir_timeout(self, mock_run, temp_dir):
         """Test running command that times out."""
-        from subprocess import TimeoutExpired
-
         mock_run.side_effect = TimeoutExpired("sleep", 10)
 
         with pytest.raises(TimeoutExpired):

@@ -3,17 +3,151 @@
 import argparse
 import glob
 import re
+from collections import Counter, defaultdict
 from pathlib import Path
+from typing import Dict, List
 
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
+import squarify
 from matplotlib.colors import LogNorm
 from matplotlib.lines import Line2D
+from ruamel.yaml import YAML
+from tqdm.auto import tqdm
 
+from swiftsim_cli.profile import load_swift_profile
 from swiftsim_cli.src_parser import (
+    compile_site_patterns,
     generate_timer_nesting_database,
+    load_timer_db,
+    scan_log_instances_by_step,
 )
 from swiftsim_cli.utilities import create_ascii_table, create_output_path
+
+
+def classify_timers_by_max(instances_by_step, timer_db, nesting_db):
+    """Classify timers dynamically with smart function timer detection.
+
+    Uses the nesting database to guide classification when available,
+    falling back to heuristics for functions not in the nesting database.
+    For functions with multiple operations listed in the nesting database,
+    looks for a generic function timer pattern. If not found, creates a
+    synthetic function timer as the sum of all operations.
+
+    Args:
+        instances_by_step: Dictionary mapping step numbers to timer
+            instances
+        timer_db: Dictionary of timer definitions by timer ID
+        nesting_db: Dictionary of nesting relationships by function name
+
+    Returns:
+        Tuple of (function_timer_ids, synthetic_function_timers) where:
+        - function_timer_ids: Set of timer IDs classified as function
+          timers
+        - synthetic_function_timers: Dict of function_name -> total_time
+          for functions needing synthetic timers
+    """
+    # Collect all timer times by function
+    timer_totals_by_function = defaultdict(lambda: defaultdict(float))
+
+    for inst_list in instances_by_step.values():
+        for inst in inst_list:
+            func_name = timer_db[inst.timer_id].function
+            timer_totals_by_function[func_name][inst.timer_id] += inst.time_ms
+
+    # For each function, determine the function timer intelligently
+    function_timer_ids = set()
+
+    # For functions without explicit function timer
+    synthetic_function_timers = {}
+
+    for func_name, timer_totals in timer_totals_by_function.items():
+        if not timer_totals:  # Skip if no timers
+            continue
+
+        # Check if nesting database has guidance for this function
+        if func_name in nesting_db and nesting_db[func_name].get(
+            "nested_operations"
+        ):
+            # Nesting database indicates this function should have
+            # multiple operations. Look for a timer that matches the
+            # function_timer pattern
+            function_timer_pattern = nesting_db[func_name].get(
+                "function_timer", ""
+            )
+            function_timer_found = False
+
+            # Try to find a timer matching the function timer pattern
+            for tid in timer_totals.keys():
+                timer_label = timer_db[tid].label_text
+                # Simple pattern matching - if function timer pattern is
+                # "took %.3f %s." then look for timers with just "took"
+                # without specific operation descriptions
+                if (
+                    function_timer_pattern
+                    and "took" in function_timer_pattern
+                    and "took" in timer_label
+                ):
+                    # Check if this is a generic "took" timer (not a
+                    # specific operation)
+                    # Specific operations usually have descriptive text
+                    # before "took"
+                    words_before_took = timer_label.split("took")[0].strip()
+                    if (
+                        not words_before_took
+                        or len(words_before_took.split()) <= 2
+                    ):
+                        # This looks like a generic function timer
+                        function_timer_ids.add(tid)
+                        function_timer_found = True
+                        break
+
+            if not function_timer_found:
+                # No function timer found, create synthetic one from sum
+                # of operations
+                total_time = sum(timer_totals.values())
+                synthetic_function_timers[func_name] = total_time
+                # All existing timers remain as operations
+        else:
+            # No nesting database guidance, fall back to heuristic
+            if len(timer_totals) == 1:
+                # Only one timer - it's the function timer
+                function_timer_ids.add(list(timer_totals.keys())[0])
+            else:
+                # Multiple timers - check if max timer represents the
+                # whole function
+                sorted_timers = sorted(
+                    timer_totals.items(), key=lambda x: x[1], reverse=True
+                )
+                max_timer_id, max_time = sorted_timers[0]
+                other_timers_sum = sum(time for tid, time in sorted_timers[1:])
+
+                # Use a more sophisticated heuristic:
+                # Only treat max timer as function timer if it's
+                # significantly larger
+                # (at least 2x) than the sum of others, indicating item
+                # encompasses them
+                ratio_threshold = 2.0
+                if max_time > ratio_threshold * other_timers_sum:
+                    # Max timer is significantly larger than sum of
+                    # others - it's the function timer
+                    function_timer_ids.add(max_timer_id)
+                else:
+                    # No single dominant timer - function timer is sum of
+                    # all operations. We'll create a synthetic function
+                    # timer entry
+                    total_time = sum(timer_totals.values())
+                    synthetic_function_timers[func_name] = total_time
+
+    # Update timer_db with dynamic classification
+    for tid, timer_def in timer_db.items():
+        if tid in function_timer_ids:
+            timer_def.timer_type = "function"
+        else:
+            timer_def.timer_type = "operation"
+
+    return function_timer_ids, synthetic_function_timers
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -1125,25 +1259,6 @@ def analyse_swift_log_timings(
       None. Figures are written to disk; a textual summary is printed to
             stdout.
     """
-    # Local imports (keeps this function self-contained)
-    import re
-    from collections import Counter, defaultdict
-
-    # Load timer nesting relationships
-    from pathlib import Path
-    from typing import Dict, List
-
-    import matplotlib.pyplot as plt
-    import numpy as np
-    from ruamel.yaml import YAML
-    from tqdm.auto import tqdm
-
-    # Heavy lifting lives in src_parser (per your constraint).
-    from swiftsim_cli.src_parser import (
-        compile_site_patterns,
-        load_timer_db,
-        scan_log_instances_by_step,
-    )
 
     def load_timer_nesting(auto_generate=True, force_regenerate=False):
         """Load timer nesting relationships.
@@ -1168,8 +1283,6 @@ def analyse_swift_log_timings(
                 )
 
                 # Try to get SWIFT source directory from profile
-                from swiftsim_cli.profile import load_swift_profile
-
                 try:
                     profile = load_swift_profile()
                     swift_src = profile.get("swift_src")
@@ -1245,135 +1358,6 @@ def analyse_swift_log_timings(
 
     # Dynamically classify timers: function timer = max time per function,
     # others = operations
-    def classify_timers_by_max(instances_by_step, timer_db, nesting_db):
-        """Classify timers dynamically with smart function timer detection.
-
-        Uses the nesting database to guide classification when available,
-        falling back to heuristics for functions not in the nesting database.
-        For functions with multiple operations listed in the nesting database,
-        looks for a generic function timer pattern. If not found, creates a
-        synthetic function timer as the sum of all operations.
-
-        Args:
-            instances_by_step: Dictionary mapping step numbers to timer
-                instances
-            timer_db: Dictionary of timer definitions by timer ID
-            nesting_db: Dictionary of nesting relationships by function name
-
-        Returns:
-            Tuple of (function_timer_ids, synthetic_function_timers) where:
-            - function_timer_ids: Set of timer IDs classified as function
-              timers
-            - synthetic_function_timers: Dict of function_name -> total_time
-              for functions needing synthetic timers
-        """
-        # Collect all timer times by function
-        timer_totals_by_function = defaultdict(lambda: defaultdict(float))
-
-        for inst_list in instances_by_step.values():
-            for inst in inst_list:
-                func_name = timer_db[inst.timer_id].function
-                timer_totals_by_function[func_name][inst.timer_id] += (
-                    inst.time_ms
-                )
-
-        # For each function, determine the function timer intelligently
-        function_timer_ids = set()
-
-        # For functions without explicit function timer
-        synthetic_function_timers = {}
-
-        for func_name, timer_totals in timer_totals_by_function.items():
-            if not timer_totals:  # Skip if no timers
-                continue
-
-            # Check if nesting database has guidance for this function
-            if func_name in nesting_db and nesting_db[func_name].get(
-                "nested_operations"
-            ):
-                # Nesting database indicates this function should have
-                # multiple operations. Look for a timer that matches the
-                # function_timer pattern
-                function_timer_pattern = nesting_db[func_name].get(
-                    "function_timer", ""
-                )
-                function_timer_found = False
-
-                # Try to find a timer matching the function timer pattern
-                for tid in timer_totals.keys():
-                    timer_label = timer_db[tid].label_text
-                    # Simple pattern matching - if function timer pattern is
-                    # "took %.3f %s." then look for timers with just "took"
-                    # without specific operation descriptions
-                    if (
-                        function_timer_pattern
-                        and "took" in function_timer_pattern
-                        and "took" in timer_label
-                    ):
-                        # Check if this is a generic "took" timer (not a
-                        # specific operation)
-                        # Specific operations usually have descriptive text
-                        # before "took"
-                        words_before_took = timer_label.split("took")[
-                            0
-                        ].strip()
-                        if (
-                            not words_before_took
-                            or len(words_before_took.split()) <= 2
-                        ):
-                            # This looks like a generic function timer
-                            function_timer_ids.add(tid)
-                            function_timer_found = True
-                            break
-
-                if not function_timer_found:
-                    # No function timer found, create synthetic one from sum
-                    # of operations
-                    total_time = sum(timer_totals.values())
-                    synthetic_function_timers[func_name] = total_time
-                    # All existing timers remain as operations
-            else:
-                # No nesting database guidance, fall back to heuristic
-                if len(timer_totals) == 1:
-                    # Only one timer - it's the function timer
-                    function_timer_ids.add(list(timer_totals.keys())[0])
-                else:
-                    # Multiple timers - check if max timer represents the
-                    # whole function
-                    sorted_timers = sorted(
-                        timer_totals.items(), key=lambda x: x[1], reverse=True
-                    )
-                    max_timer_id, max_time = sorted_timers[0]
-                    other_timers_sum = sum(
-                        time for tid, time in sorted_timers[1:]
-                    )
-
-                    # Use a more sophisticated heuristic:
-                    # Only treat max timer as function timer if it's
-                    # significantly larger
-                    # (at least 2x) than the sum of others, indicating item
-                    # encompasses them
-                    ratio_threshold = 2.0
-                    if max_time > ratio_threshold * other_timers_sum:
-                        # Max timer is significantly larger than sum of
-                        # others - it's the function timer
-                        function_timer_ids.add(max_timer_id)
-                    else:
-                        # No single dominant timer - function timer is sum of
-                        # all operations. We'll create a synthetic function
-                        # timer entry
-                        total_time = sum(timer_totals.values())
-                        synthetic_function_timers[func_name] = total_time
-
-        # Update timer_db with dynamic classification
-        for tid, timer_def in timer_db.items():
-            if tid in function_timer_ids:
-                timer_def.timer_type = "function"
-            else:
-                timer_def.timer_type = "operation"
-
-        return function_timer_ids, synthetic_function_timers
-
     print(
         "Dynamically classifying timers based on maximum time per function..."
     )
@@ -1936,8 +1920,6 @@ def analyse_swift_log_timings(
     # 11) Hierarchical call graph visualization
     if nesting_db:
         try:
-            import networkx as nx
-
             # Build the call graph
             G = nx.DiGraph()
 
@@ -2028,8 +2010,6 @@ def analyse_swift_log_timings(
     # 12) Hierarchical timing breakdown (treemap style using matplotlib)
     if nesting_db and function_stats:
         try:
-            import squarify
-
             # Get top-level functions (those not called by others)
             all_nested = set()
             for func_data in nesting_db.values():
@@ -2378,8 +2358,6 @@ def analyse_swift_log_timings(
     # 16) Function call hierarchy treemap visualization
     if nesting_db and function_stats:
         try:
-            import squarify  # For treemap visualization
-
             # Build hierarchical data for treemap
             def build_treemap_data():
                 treemap_data = []

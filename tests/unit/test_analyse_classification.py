@@ -1,132 +1,16 @@
 """Unit tests for timer classification in the analyse module."""
 
-from collections import defaultdict
-
+from swiftsim_cli.modes.analyse import classify_timers_by_max
 from swiftsim_cli.src_parser import TimerDef, TimerInstance
 
 
 class TestTimerClassification:
     """Test timer classification logic."""
 
-    def create_timer_classification_function(self):
-        """Create the timer classification function for testing."""
-
-        def classify_timers_by_max(instances_by_step, timer_db, nesting_db):
-            """Classify timers dynamically."""
-            # Collect all timer times by function
-            timer_totals_by_function = defaultdict(lambda: defaultdict(float))
-
-            for inst_list in instances_by_step.values():
-                for inst in inst_list:
-                    func_name = timer_db[inst.timer_id].function
-                    timer_totals_by_function[func_name][inst.timer_id] += (
-                        inst.time_ms
-                    )
-
-            # For each function, determine the function timer intelligently
-            function_timer_ids = set()
-            synthetic_function_timers = {}
-
-            for func_name, timer_totals in timer_totals_by_function.items():
-                if not timer_totals:  # Skip if no timers
-                    continue
-
-                # Check if nesting database has guidance for this function
-                if func_name in nesting_db and nesting_db[func_name].get(
-                    "nested_operations"
-                ):
-                    # Nesting database indicates this function should have
-                    # multiple operations Look for a timer that matches the
-                    # function_timer pattern
-                    function_timer_pattern = nesting_db[func_name].get(
-                        "function_timer", ""
-                    )
-                    function_timer_found = False
-
-                    # Try to find a timer matching the function timer pattern
-                    for tid in timer_totals.keys():
-                        timer_label = timer_db[tid].label_text
-                        # Simple pattern matching - if function timer pattern
-                        # is "took %.3f %s." then look for timers with just
-                        # "took" without specific operation descriptions
-                        if (
-                            function_timer_pattern
-                            and "took" in function_timer_pattern
-                            and "took" in timer_label
-                        ):
-                            # Check if this is a generic "took" timer (not a
-                            # specific operation)
-                            # Specific operations usually have descriptive
-                            # text before "took"
-                            words_before_took = timer_label.split("took")[
-                                0
-                            ].strip()
-                            if (
-                                not words_before_took
-                                or len(words_before_took.split()) <= 2
-                            ):
-                                # This looks like a generic function timer
-                                function_timer_ids.add(tid)
-                                function_timer_found = True
-                                break
-
-                    if not function_timer_found:
-                        # No function timer found, create synthetic one from
-                        # sum of operations
-                        total_time = sum(timer_totals.values())
-                        synthetic_function_timers[func_name] = total_time
-                        # All existing timers remain as operations
-                else:
-                    # No nesting database guidance, fall back to heuristic
-                    if len(timer_totals) == 1:
-                        # Only one timer - it's the function timer
-                        function_timer_ids.add(list(timer_totals.keys())[0])
-                    else:
-                        # Multiple timers - check if max timer represents the
-                        # whole function
-                        sorted_timers = sorted(
-                            timer_totals.items(),
-                            key=lambda x: x[1],
-                            reverse=True,
-                        )
-                        max_timer_id, max_time = sorted_timers[0]
-                        other_timers_sum = sum(
-                            time for tid, time in sorted_timers[1:]
-                        )
-
-                        # Use a more sophisticated heuristic:
-                        # Only treat max timer as function timer if it's
-                        # significantly larger (at least 2x) than the sum of
-                        # others, indicating it encompasses them
-                        ratio_threshold = 2.0
-                        if max_time > ratio_threshold * other_timers_sum:
-                            # Max timer is significantly larger than sum of
-                            # others - it's the function timer
-                            function_timer_ids.add(max_timer_id)
-                        else:
-                            # No single dominant timer - function timer is
-                            # sum of all operations. We'll create a synthetic
-                            # function timer entry
-                            total_time = sum(timer_totals.values())
-                            synthetic_function_timers[func_name] = total_time
-
-            # Update timer_db with dynamic classification
-            for tid, timer_def in timer_db.items():
-                if tid in function_timer_ids:
-                    timer_def.timer_type = "function"
-                else:
-                    timer_def.timer_type = "operation"
-
-            return function_timer_ids, synthetic_function_timers
-
-        return classify_timers_by_max
-
     def test_single_timer_classification(
         self, sample_timer_db, sample_nesting_db
     ):
         """Test classification when function has only one timer."""
-        classify_func = self.create_timer_classification_function()
-
         # Create instances for a function with single timer
         instances_by_step = {
             0: [
@@ -149,7 +33,7 @@ class TestTimerClassification:
         # Nesting DB without nested operations for this function
         nesting_db = {}
 
-        function_timer_ids, synthetic_timers = classify_func(
+        function_timer_ids, synthetic_timers = classify_timers_by_max(
             instances_by_step, single_timer_db, nesting_db
         )
 
@@ -160,8 +44,6 @@ class TestTimerClassification:
         self, sample_timer_db, sample_nesting_db
     ):
         """Test classification for space_split with nesting database."""
-        classify_func = self.create_timer_classification_function()
-
         # Create instances for space_split function
         instances_by_step = {
             0: [
@@ -190,7 +72,7 @@ class TestTimerClassification:
             "space_split.c:105": sample_timer_db["space_split.c:105"],
         }
 
-        function_timer_ids, synthetic_timers = classify_func(
+        function_timer_ids, synthetic_timers = classify_timers_by_max(
             instances_by_step, space_split_timer_db, sample_nesting_db
         )
 
@@ -203,8 +85,6 @@ class TestTimerClassification:
 
     def test_heuristic_classification_large_ratio(self, sample_timer_db):
         """Test heuristic classification when max timer is larger."""
-        classify_func = self.create_timer_classification_function()
-
         # Create instances where one timer is much larger (> 2x) than others
         instances_by_step = {
             0: [
@@ -235,7 +115,7 @@ class TestTimerClassification:
         # No nesting database guidance
         nesting_db = {}
 
-        function_timer_ids, synthetic_timers = classify_func(
+        function_timer_ids, synthetic_timers = classify_timers_by_max(
             instances_by_step, space_split_timer_db, nesting_db
         )
 
@@ -245,8 +125,6 @@ class TestTimerClassification:
 
     def test_heuristic_classification_small_ratio(self, sample_timer_db):
         """Test heuristic classification when max timer is not larger."""
-        classify_func = self.create_timer_classification_function()
-
         # Create instances where timers are similar in size
         instances_by_step = {
             0: [
@@ -277,7 +155,7 @@ class TestTimerClassification:
         # No nesting database guidance
         nesting_db = {}
 
-        function_timer_ids, synthetic_timers = classify_func(
+        function_timer_ids, synthetic_timers = classify_timers_by_max(
             instances_by_step, space_split_timer_db, nesting_db
         )
 
@@ -290,8 +168,6 @@ class TestTimerClassification:
         self, sample_timer_db, sample_nesting_db
     ):
         """Test nesting database when function timer pattern is found."""
-        classify_func = self.create_timer_classification_function()
-
         # Add a generic "took" timer to the database
         generic_timer_db = dict(sample_timer_db)
         generic_timer_db["space_split.c:110"] = TimerDef(
@@ -333,7 +209,7 @@ class TestTimerClassification:
             ]
         }
 
-        function_timer_ids, synthetic_timers = classify_func(
+        function_timer_ids, synthetic_timers = classify_timers_by_max(
             instances_by_step, generic_timer_db, sample_nesting_db
         )
 
@@ -343,13 +219,11 @@ class TestTimerClassification:
 
     def test_empty_instances(self):
         """Test classification with empty instances."""
-        classify_func = self.create_timer_classification_function()
-
         instances_by_step = {}
         timer_db = {}
         nesting_db = {}
 
-        function_timer_ids, synthetic_timers = classify_func(
+        function_timer_ids, synthetic_timers = classify_timers_by_max(
             instances_by_step, timer_db, nesting_db
         )
 
@@ -358,8 +232,6 @@ class TestTimerClassification:
 
     def test_nesting_db_none_function_timer_pattern(self, sample_timer_db):
         """Test nesting database when function_timer is None."""
-        classify_func = self.create_timer_classification_function()
-
         instances_by_step = {
             0: [
                 TimerInstance(
@@ -387,7 +259,7 @@ class TestTimerClassification:
             "space_split.c:100": sample_timer_db["space_split.c:100"]
         }
 
-        function_timer_ids, synthetic_timers = classify_func(
+        function_timer_ids, synthetic_timers = classify_timers_by_max(
             instances_by_step, space_split_timer_db, nesting_db
         )
 
