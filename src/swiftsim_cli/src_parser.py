@@ -821,11 +821,15 @@ class TimerNestingGenerator:
 
         for timer_dict in self.timer_data:
             func_name = timer_dict["function"]
-            timer_type = timer_dict["timer_type"]
+            label_text = timer_dict.get("label_text", "")
 
-            if timer_type == "function":
+            # Classify timers based on their label text
+            # Function timers typically have generic "took %.3f %s." labels
+            # Operation timers have specific descriptive text
+            if label_text in ["took %.3f %s.", "took %.3f %s"]:
                 self.function_timers[func_name] = timer_dict
-            elif timer_type == "operation":
+            else:
+                # Treat as operation timer
                 if func_name not in self.function_operations:
                     self.function_operations[func_name] = []
                 self.function_operations[func_name].append(timer_dict)

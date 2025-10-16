@@ -26,7 +26,9 @@ from swiftsim_cli.src_parser import (
 from swiftsim_cli.utilities import create_ascii_table, create_output_path
 
 
-def classify_timers_by_max(instances_by_step, timer_db, nesting_db):
+def classify_timers_by_max(
+    instances_by_step: Dict, timer_db: Dict, nesting_db: Dict
+) -> tuple[set, Dict]:
     """Classify timers dynamically with smart function timer detection.
 
     Uses the nesting database to guide classification when available,
@@ -82,23 +84,17 @@ def classify_timers_by_max(instances_by_step, timer_db, nesting_db):
             for tid in timer_totals.keys():
                 timer_label = timer_db[tid].label_text
                 # Simple pattern matching - if function timer pattern is
-                # "took %.3f %s." then look for timers with just "took"
-                # without specific operation descriptions
+                # "took %.3f %s." then look for timers matching that pattern
                 if (
                     function_timer_pattern
-                    and "took" in function_timer_pattern
-                    and "took" in timer_label
+                    and function_timer_pattern == "took %.3f %s."
                 ):
-                    # Check if this is a generic "took" timer (not a
-                    # specific operation)
-                    # Specific operations usually have descriptive text
-                    # before "took"
-                    words_before_took = timer_label.split("took")[0].strip()
-                    if (
-                        not words_before_took
-                        or len(words_before_took.split()) <= 2
-                    ):
-                        # This looks like a generic function timer
+                    # Look for timers with pattern "function_name: took X ms"
+                    # The generic function timer should be just "took" without
+                    # descriptive operations
+                    if ": took " in timer_label and " ms." in timer_label:
+                        # This looks like a function timer:
+                        # "engine_rebuild: took 123.456 ms."
                         function_timer_ids.add(tid)
                         function_timer_found = True
                         break
@@ -383,10 +379,13 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
     log_parser.add_argument(
-        "--regenerate-nesting",
-        action="store_true",
-        help="Force regeneration of timer nesting database from source code.",
-        default=False,
+        "--hierarchy-functions",
+        nargs="*",
+        help="Functions to show hierarchical timing for. If not specified, "
+        "shows default important functions: engine_rebuild, space_rebuild, "
+        "and engine_maketasks. Use 'all' to show all functions "
+        "with hierarchy data, or specify individual function names.",
+        default=None,
     )
 
 
@@ -437,7 +436,7 @@ def run_swift_log_timing(args: argparse.Namespace) -> None:
         prefix=args.prefix,
         show_plot=args.show,
         top_n=args.top_n,
-        regenerate_nesting=args.regenerate_nesting,
+        hierarchy_functions=args.hierarchy_functions,
     )
 
 
@@ -1221,30 +1220,33 @@ def analyse_swift_log_timings(
     prefix: str | None = None,
     show_plot: bool = True,
     top_n: int = 20,
-    regenerate_nesting: bool = False,
+    hierarchy_functions: list[str] | None = None,
 ) -> None:
-    """Analyse SWIFT timing logs and emit full reports.
+    """Analyse SWIFT timing logs and emit comprehensive timing reports.
 
-    This function is a drop-in analysis routine that restores and expands the
-    outputs from your original analysis, while fixing nested timer
-    double-counting using a pre-built YAML database of timing sites.
+    This function provides advanced timing analysis of SWIFT simulation logs,
+    featuring hierarchical timing breakdowns that avoid double-counting and
+    provide clear visibility into function performance.
 
-    It:
-      * Parses step lines and task/category sections from the log (as before),
-      * Uses `src_parser` helpers to map log lines to specific timing sites
-        and to compute **exclusive** times (inclusive minus nested children),
-      * Produces the same plots/tables you had originally (top by total time,
-        top by calls, distributions, task categories over time, pies, counts,
-        cumulative curves), plus an **Inclusive vs Exclusive** comparison,
-      * Estimates per-step **untimed** time when a step total is available.
+    Key Features:
+      * Automatically generates timer nesting database from SWIFT source code
+      * Parses log files to extract timer instances and step information
+      * Creates hierarchical timing tables showing function call trees
+      * Implements function timer = max(explicit_timer, sum_of_nested) rule
+      * Shows "UNACCOUNTED TIME" for missing instrumentation
+      * Produces standard plots: top timers, distributions, task counts, etc.
+      * Estimates per-step untimed overhead when step totals are available
+
+    Hierarchical Analysis:
+      * Functions are analyzed using nesting relationships from source code
+      * Direct operations and nested function calls are properly accounted
+      * Percentages are calculated against corrected function timer totals
+      * Tables show proper indentation and avoid double-counting issues
 
     Notes:
-      * All site matching / nested-time logic is delegated to `src_parser`.
-      * Display names use `function [file:line]` for uniqueness and
-        traceability (based on timer_id from YAML).
-      * The step "Wall-clock time [ms]" is parsed as the **last float** on
-        the step line. If you have the exact column index, you can replace
-        that one-liner.
+      * Nesting database is regenerated automatically from SWIFT source code
+      * Display names use `function [file:line]` format for traceability
+      * Function timers use the maximum of explicit timers and nested sums
 
     Args:
       log_file: Path to the SWIFT log file to analyse.
@@ -1252,8 +1254,8 @@ def analyse_swift_log_timings(
       prefix: Optional filename prefix and output subdirectory prefix.
       show_plot: Whether to display plots interactively.
       top_n: Number of top timers shown in multi-item plots/tables.
-      regenerate_nesting: Force regeneration of timer nesting database from
-      source.
+      hierarchy_functions: Functions to show hierarchical timing for. If None,
+        shows default important functions. Use ["all"] to show all functions.
 
     Returns:
       None. Figures are written to disk; a textual summary is printed to
@@ -1333,9 +1335,7 @@ def analyse_swift_log_timings(
     # Load DB + compile patterns
     timer_db = load_timer_db()
     compiled = compile_site_patterns(timer_db)
-    nesting_db = load_timer_nesting(
-        auto_generate=True, force_regenerate=regenerate_nesting
-    )
+    nesting_db = load_timer_nesting(auto_generate=True, force_regenerate=True)
     print(
         f"Loaded {len(timer_db)} timer definitions and compiled "
         f"{len(compiled)} patterns"
@@ -3046,6 +3046,55 @@ def analyse_swift_log_timings(
                     # If no function timer and no operations, skip completely
                     continue
 
+        # Calculate unaccounted time (only for top level, when indent is "")
+        if indent == "":
+            # Sum up only direct children (level 1) - operations from this
+            # function plus nested functions
+            # This avoids double-counting since nested functions already
+            # include their own operations
+            accounted_time = 0.0
+
+            # Add direct operations from this function level
+            for tid, stats in hierarchy["operations"]:
+                accounted_time += stats["total_time"]
+
+            # Add direct nested functions (they already include their own
+            # nested content)
+            for nested_func_name, nested_hierarchy in hierarchy[
+                "nested_functions"
+            ].items():
+                if nested_hierarchy["function"]:
+                    _, func_stats = nested_hierarchy["function"]
+                    accounted_time += func_stats["total_time"]
+
+            # Calculate unaccounted time as the difference between total
+            # function time and the sum of direct children
+            unaccounted_time = function_timer_time - accounted_time
+            if unaccounted_time > 0.1:  # Only show if significant (> 0.1 ms)
+                pct_unaccounted = (
+                    (100 * unaccounted_time / function_timer_time)
+                    if function_timer_time > 0
+                    else 0.0
+                )
+                unaccounted_row = [
+                    f"{indent}└─ UNACCOUNTED TIME",
+                    f"{unaccounted_time:.1f}",
+                    f"{pct_unaccounted:.1f}%",
+                    "-",
+                    "-",
+                ]
+                # Add unaccounted time to the items list so it gets sorted
+                # properly by time
+                all_items.append(
+                    (
+                        unaccounted_time,
+                        "unaccounted",
+                        unaccounted_row,
+                        None,
+                        None,
+                    )
+                )
+
         # Sort all items by time descending
         all_items.sort(key=lambda x: x[0], reverse=True)
 
@@ -3097,9 +3146,35 @@ def analyse_swift_log_timings(
         func_totals.items(), key=lambda x: x[1], reverse=True
     )
 
-    for func_name, func_total in sorted_funcs[
-        : min(top_n, 10)
-    ]:  # Show top functions
+    # Determine which functions to show hierarchically
+    if hierarchy_functions is None:
+        # Default to showing a few key functions that are typically important
+        default_functions = [
+            "engine_rebuild",
+            "space_rebuild",
+            "engine_maketasks",
+        ]
+        functions_to_show = [
+            (func_name, func_totals.get(func_name, 0))
+            for func_name in default_functions
+            if func_name in func_totals
+        ]
+        # Sort by total time
+        functions_to_show.sort(key=lambda x: x[1], reverse=True)
+    elif len(hierarchy_functions) == 1 and hierarchy_functions[0] == "all":
+        # Show all functions with hierarchy data (up to top_n limit)
+        functions_to_show = sorted_funcs[: min(top_n, 10)]
+    else:
+        # Show only the specified functions
+        functions_to_show = [
+            (func_name, func_totals.get(func_name, 0))
+            for func_name in hierarchy_functions
+            if func_name in func_totals
+        ]
+        # Sort by total time
+        functions_to_show.sort(key=lambda x: x[1], reverse=True)
+
+    for func_name, func_total in functions_to_show:
         # Build hierarchical timer structure for this function (non-recursive
         # for display)
         if func_name in nesting_db:
@@ -3132,17 +3207,28 @@ def analyse_swift_log_timings(
         ):
             continue
 
-        # Find the function timer (baseline for 100%)
-        function_timer_time = 0.0
+        # Calculate function timer time using the rule:
+        # function_timer = max(explicit_function_timer, sum_of_nested_timers)
+        explicit_function_timer_time = 0.0
         if hierarchy["function"]:
             _, func_stats = hierarchy["function"]
-            function_timer_time = func_stats["total_time"]
-        else:
-            # If no function timer, skip (we need a baseline)
-            continue
+            explicit_function_timer_time = func_stats["total_time"]
+
+        # Calculate sum of all nested timers (operations + nested functions)
+        nested_sum = 0.0
+        for _, stats in hierarchy["operations"]:
+            nested_sum += stats["total_time"]
+
+        for nested_func_hierarchy in hierarchy["nested_functions"].values():
+            if nested_func_hierarchy["function"]:
+                _, nested_func_stats = nested_func_hierarchy["function"]
+                nested_sum += nested_func_stats["total_time"]
+
+        # Apply the rule: function timer = max(explicit, sum_of_nested)
+        function_timer_time = max(explicit_function_timer_time, nested_sum)
 
         if function_timer_time == 0.0:
-            continue  # Skip if no function timer found
+            continue  # Skip if no timer data found
 
         print(
             f"\n{func_name}: {function_timer_time:.1f} ms "
@@ -3165,11 +3251,13 @@ def analyse_swift_log_timings(
             function_label = "Function execution time"
             if tid.startswith("SYNTHETIC:"):
                 function_label = "Function execution time (sum of operations)"
-            pcent = func_stats["total_time"] / func_stats["call_count"]
+            # Use function_timer_time (the corrected max value) instead of
+            # func_stats total_time
+            pcent = function_timer_time / func_stats["call_count"]
             rows.append(
                 [
                     function_label,
-                    f"{func_stats['total_time']:.1f}",
+                    f"{function_timer_time:.1f}",
                     "100.0%",
                     f"{func_stats['call_count']}",
                     f"{pcent:.2f}",
