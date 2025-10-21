@@ -2,11 +2,9 @@
 
 import argparse
 import sys
-from pathlib import Path
 from typing import List, Sequence, Tuple
 
 from swiftsim_cli.modes import AVAILABLE_MODES, MODE_MODULES, Mode
-from swiftsim_cli.profile import load_swift_profile
 
 
 class MultiModeCLIArgs:
@@ -51,27 +49,6 @@ class MultiModeCLIArgs:
             Tuple of (global_args, remaining_argv)
         """
         parser = argparse.ArgumentParser(add_help=False)
-        parser.add_argument("-v", "--verbose", action="store_true")
-
-        # Get the config for defaults
-        config = load_swift_profile()
-        swift_dir = config.swiftsim_dir if config else None
-        data_dir = config.data_dir if config else None
-
-        parser.add_argument(
-            "--swift-dir",
-            type=Path,
-            help="Path to the SWIFT directory (overrides config "
-            f"file: {swift_dir}).",
-            default=None,
-        )
-        parser.add_argument(
-            "--data-dir",
-            type=Path,
-            help="Path to the data directory (overrides config "
-            f"file: {data_dir}).",
-            default=None,
-        )
 
         # Parse known global args and return the rest
         global_args, remaining = parser.parse_known_args(argv)
@@ -177,15 +154,7 @@ class MultiModeCLIArgs:
         print("swift-cli: Utilities for Swift development workflows")
         print()
         print("Usage:")
-        print(
-            "  swift-cli [--verbose] [--swift-dir DIR] [--data-dir DIR] "
-            "<mode1> [mode1_args] [<mode2> [mode2_args]] ..."
-        )
-        print()
-        print("Global options:")
-        print("  -v, --verbose     Enable verbose output")
-        print("  --swift-dir DIR   Path to SWIFT directory")
-        print("  --data-dir DIR    Path to data directory")
+        print("  swift-cli <mode1> [mode1_args] [<mode2> [mode2_args]] ...")
         print()
         print("Available modes:")
 
