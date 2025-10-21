@@ -819,20 +819,41 @@ class TimerNestingGenerator:
         self.function_timers = {}  # function_name -> timer_dict
         self.function_operations = {}  # function_name -> List[timer_dict]
 
+        # Group all timers by function first
+        timers_by_function = {}
         for timer_dict in self.timer_data:
             func_name = timer_dict["function"]
-            label_text = timer_dict.get("label_text", "")
+            if func_name not in timers_by_function:
+                timers_by_function[func_name] = []
+            timers_by_function[func_name].append(timer_dict)
 
-            # Classify timers based on their label text
-            # Function timers typically have generic "took %.3f %s." labels
-            # Operation timers have specific descriptive text
-            if label_text in ["took %.3f %s.", "took %.3f %s"]:
-                self.function_timers[func_name] = timer_dict
-            else:
-                # Treat as operation timer
-                if func_name not in self.function_operations:
-                    self.function_operations[func_name] = []
-                self.function_operations[func_name].append(timer_dict)
+        # For each function, identify the function-level timer based on label
+        # Function timers have generic labels like "took %.3f %s."
+        # Operation timers have specific descriptive text
+        for func_name, timers in timers_by_function.items():
+            function_timer = None
+            operation_timers = []
+
+            # Look for a timer with generic "took" label (function timer)
+            for timer_dict in timers:
+                label_text = timer_dict.get("label_text", "")
+                if label_text in ["took %.3f %s.", "took %.3f %s"]:
+                    function_timer = timer_dict
+                else:
+                    operation_timers.append(timer_dict)
+
+            # If no generic timer found, use the one with the highest end_line
+            # (last timer in function)
+            if not function_timer and timers:
+                function_timer = max(
+                    timers, key=lambda t: t.get("end_line", 0)
+                )
+                operation_timers = [t for t in timers if t != function_timer]
+
+            if function_timer:
+                self.function_timers[func_name] = function_timer
+            if operation_timers:
+                self.function_operations[func_name] = operation_timers
 
     def generate_nesting_database(self) -> Dict:
         """Generate complete nesting database in YAML format.

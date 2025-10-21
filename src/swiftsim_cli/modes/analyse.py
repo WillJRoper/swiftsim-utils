@@ -8,9 +8,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import matplotlib.pyplot as plt
-import networkx as nx
 import numpy as np
-import squarify
 from matplotlib.colors import LogNorm
 from matplotlib.lines import Line2D
 from ruamel.yaml import YAML
@@ -26,124 +24,53 @@ from swiftsim_cli.src_parser import (
 from swiftsim_cli.utilities import create_ascii_table, create_output_path
 
 
-def classify_timers_by_max(
+def classify_timers_by_max_time(
     instances_by_step: Dict, timer_db: Dict, nesting_db: Dict
-) -> tuple[set, Dict]:
-    """Classify timers dynamically with smart function timer detection.
+) -> set:
+    """Classify timers using max time per function.
 
-    Uses the nesting database to guide classification when available,
-    falling back to heuristics for functions not in the nesting database.
-    For functions with multiple operations listed in the nesting database,
-    looks for a generic function timer pattern. If not found, creates a
-    synthetic function timer as the sum of all operations.
+    For each function, the timer with the most total time is treated as the
+    function timer. All others are operation timers. No synthetic timers.
 
     Args:
-        instances_by_step: Dictionary mapping step numbers to timer
-            instances
+        instances_by_step: Dictionary mapping step numbers to timer instances
         timer_db: Dictionary of timer definitions by timer ID
         nesting_db: Dictionary of nesting relationships by function name
 
     Returns:
-        Tuple of (function_timer_ids, synthetic_function_timers) where:
-        - function_timer_ids: Set of timer IDs classified as function
-          timers
-        - synthetic_function_timers: Dict of function_name -> total_time
-          for functions needing synthetic timers
+        Set of timer IDs that are function timers
     """
-    # Collect all timer times by function
-    timer_totals_by_function = defaultdict(lambda: defaultdict(float))
-
-    for inst_list in instances_by_step.values():
-        for inst in inst_list:
-            func_name = timer_db[inst.timer_id].function
-            timer_totals_by_function[func_name][inst.timer_id] += inst.time_ms
-
-    # For each function, determine the function timer intelligently
     function_timer_ids = set()
 
-    # For functions without explicit function timer
-    synthetic_function_timers = {}
+    # Calculate total time per timer
+    timer_totals = defaultdict(float)
+    for inst_list in instances_by_step.values():
+        for inst in inst_list:
+            timer_totals[inst.timer_id] += inst.time_ms
 
-    for func_name, timer_totals in timer_totals_by_function.items():
-        if not timer_totals:  # Skip if no timers
-            continue
+    # Group timers by function
+    timers_by_function = defaultdict(list)
+    for tid, total_time in timer_totals.items():
+        if tid in timer_db:
+            func_name = timer_db[tid].function
+            timers_by_function[func_name].append((tid, total_time))
 
-        # Check if nesting database has guidance for this function
-        if func_name in nesting_db and nesting_db[func_name].get(
-            "nested_operations"
-        ):
-            # Nesting database indicates this function should have
-            # multiple operations. Look for a timer that matches the
-            # function_timer pattern
-            function_timer_pattern = nesting_db[func_name].get(
-                "function_timer", ""
-            )
-            function_timer_found = False
+    # For each function, select the timer with max time as function timer
+    for func_name, timer_list in timers_by_function.items():
+        if timer_list:
+            # Sort by total time and pick the highest
+            timer_list.sort(key=lambda x: x[1], reverse=True)
+            max_timer_id = timer_list[0][0]
+            function_timer_ids.add(max_timer_id)
 
-            # Try to find a timer matching the function timer pattern
-            for tid in timer_totals.keys():
-                timer_label = timer_db[tid].label_text
-                # Simple pattern matching - if function timer pattern is
-                # "took %.3f %s." then look for timers matching that pattern
-                if (
-                    function_timer_pattern
-                    and function_timer_pattern == "took %.3f %s."
-                ):
-                    # Look for timers with pattern "function_name: took X ms"
-                    # The generic function timer should be just "took" without
-                    # descriptive operations
-                    if ": took " in timer_label and " ms." in timer_label:
-                        # This looks like a function timer:
-                        # "engine_rebuild: took 123.456 ms."
-                        function_timer_ids.add(tid)
-                        function_timer_found = True
-                        break
-
-            if not function_timer_found:
-                # No function timer found, create synthetic one from sum
-                # of operations
-                total_time = sum(timer_totals.values())
-                synthetic_function_timers[func_name] = total_time
-                # All existing timers remain as operations
-        else:
-            # No nesting database guidance, fall back to heuristic
-            if len(timer_totals) == 1:
-                # Only one timer - it's the function timer
-                function_timer_ids.add(list(timer_totals.keys())[0])
-            else:
-                # Multiple timers - check if max timer represents the
-                # whole function
-                sorted_timers = sorted(
-                    timer_totals.items(), key=lambda x: x[1], reverse=True
-                )
-                max_timer_id, max_time = sorted_timers[0]
-                other_timers_sum = sum(time for tid, time in sorted_timers[1:])
-
-                # Use a more sophisticated heuristic:
-                # Only treat max timer as function timer if it's
-                # significantly larger
-                # (at least 2x) than the sum of others, indicating item
-                # encompasses them
-                ratio_threshold = 2.0
-                if max_time > ratio_threshold * other_timers_sum:
-                    # Max timer is significantly larger than sum of
-                    # others - it's the function timer
-                    function_timer_ids.add(max_timer_id)
-                else:
-                    # No single dominant timer - function timer is sum of
-                    # all operations. We'll create a synthetic function
-                    # timer entry
-                    total_time = sum(timer_totals.values())
-                    synthetic_function_timers[func_name] = total_time
-
-    # Update timer_db with dynamic classification
+    # Update timer type classification in timer_db for analysis
     for tid, timer_def in timer_db.items():
         if tid in function_timer_ids:
             timer_def.timer_type = "function"
         else:
             timer_def.timer_type = "operation"
 
-    return function_timer_ids, synthetic_function_timers
+    return function_timer_ids
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -360,7 +287,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "-p",
         type=str,
         help="A prefix to add to the analysis files (default: '').",
-        default="",
+        default=None,
     )
 
     log_parser.add_argument(
@@ -1356,19 +1283,22 @@ def analyse_swift_log_timings(
         f"{len(instances_by_step)} steps"
     )
 
-    # Dynamically classify timers: function timer = max time per function,
-    # others = operations
+    # Classify timers: timer with max time per function becomes function timer
     print(
-        "Dynamically classifying timers based on maximum time per function..."
+        "Classifying timers: max time per function becomes function timer..."
     )
-    function_timer_ids, synthetic_function_timers = classify_timers_by_max(
+    function_timer_ids = classify_timers_by_max_time(
         instances_by_step, timer_db, nesting_db
     )
-    print(f"Identified {len(function_timer_ids)} explicit function timers")
-    print(
-        f"Identified {len(synthetic_function_timers)} synthetic function"
-        " timers (sum of operations)"
-    )
+    print(f"Identified {len(function_timer_ids)} function timers")
+
+    # Update timer instances with the new classification
+    for inst_list in instances_by_step.values():
+        for inst in inst_list:
+            if inst.timer_id in function_timer_ids:
+                inst.timer_type = "function"
+            else:
+                inst.timer_type = "operation"
 
     # Aggregate timing statistics by timer site and timer type
     print("Aggregating timing statistics by timer site and type...")
@@ -1419,21 +1349,7 @@ def analyse_swift_log_timings(
         tid: build_stats(vals) for tid, vals in function_times_by_tid.items()
     }
 
-    # Add synthetic function timers (sum of operations for functions
-    # without explicit function timer)
-    for func_name, total_time in synthetic_function_timers.items():
-        # Create a synthetic timer ID for this function
-        synthetic_tid = f"SYNTHETIC:{func_name}"
-        # Add to function stats as a single call with the total time
-        function_stats[synthetic_tid] = {
-            "total_time": total_time,
-            "mean_time": total_time,
-            "median_time": total_time,
-            "std_time": 0.0,
-            "max_time": total_time,
-            "min_time": total_time,
-            "call_count": 1,
-        }
+    # Note: No synthetic timers - only use actual function timers from the log
     operation_stats = {
         tid: build_stats(vals) for tid, vals in operation_times_by_tid.items()
     }
@@ -1441,9 +1357,6 @@ def analyse_swift_log_timings(
     # Sort by total time for each timer type
     sorted_functions = sorted(
         function_stats.items(), key=lambda x: x[1]["total_time"], reverse=True
-    )
-    sorted_operations = sorted(
-        operation_stats.items(), key=lambda x: x[1]["total_time"], reverse=True
     )
 
     # For legacy compatibility, combine all timers for some plots
@@ -1543,7 +1456,24 @@ def analyse_swift_log_timings(
     print("Generating analysis plots...")
     plots_created: List[str] = []
 
-    # Helper: light label truncation
+    # Helper function for clean labels
+    def clean_label(s: str, max_len: int = 30) -> str:
+        """Clean and truncate labels for better readability."""
+        if len(s) <= max_len:
+            return s
+        return s[: max_len - 3] + "..."
+
+    # Helper function to avoid overlapping labels
+    def avoid_label_overlap(ax, labels, values, orientation="horizontal"):
+        """Adjust label positions to avoid overlap."""
+        if orientation == "horizontal":
+            # For horizontal bar charts, adjust y-tick label font size
+            ax.tick_params(axis="y", labelsize=8)
+        else:
+            # For vertical plots, rotate labels
+            ax.tick_params(axis="x", rotation=45, labelsize=8)
+
+    # Helper: light label truncation (legacy)
     def trunc(s: str, n: int) -> str:
         return s if len(s) <= n else (s[:n] + "...")
 
@@ -1581,1100 +1511,663 @@ def analyse_swift_log_timings(
             plt.show()
         plt.close()
 
-    # 1b) Top operation timers by total time (log scale)
-    if sorted_operations:
+    # 1) Clean function timing bar chart (single panel)
+    if sorted_functions:
+        print("Creating function timing chart...")
+
         fig, ax = plt.subplots(figsize=(12, 8))
-        top = sorted_operations[:top_n]
-        names = [display_name(tid) for tid, _ in top]
-        totals = [st["total_time"] for _, st in top]
-        bars = ax.barh(range(len(names)), totals)
-        ax.set_yticks(range(len(names)))
-        ax.set_yticklabels([trunc(n, 60) for n in names], fontsize=10)
-        ax.set_xlabel("Total Time (ms)")
-        ax.set_title(f"Top {top_n} Operation Timers by Total Time")
-        ax.set_xscale("log")
-        ax.grid(True, alpha=0.3, axis="x")
-        for i, b in enumerate(bars):
-            ax.text(
-                b.get_width() * 1.01,
-                b.get_y() + b.get_height() / 2,
-                f"{totals[i]:.1f}ms",
-                va="center",
-                fontsize=9,
+
+        # Take top 15 functions for better readability
+        top_funcs = sorted_functions[:15]
+        names = []
+        times = []
+
+        for tid, stats in top_funcs:
+            # Clean up function names for better display
+            # Handle both regular and synthetic timer IDs
+            if tid in timer_db:
+                func_name = timer_db[tid].function
+            elif tid.startswith("SYNTHETIC:"):
+                func_name = tid.replace("SYNTHETIC:", "")
+            else:
+                func_name = "Unknown"
+            # Remove SYNTHETIC prefix and cleanup
+            clean_name = (
+                func_name.replace("SYNTHETIC:", "").replace("_", " ").title()
             )
+            names.append(clean_name)
+            times.append(stats["total_time"])
+
+        # Use a professional color gradient
+        colors = plt.cm.Blues_r(np.linspace(0.3, 0.9, len(names)))
+
+        # Create horizontal bar chart
+        bars = ax.barh(
+            range(len(names)),
+            times,
+            color=colors,
+            alpha=0.8,
+            edgecolor="white",
+            linewidth=0.5,
+        )
+
+        # Clean formatting
+        ax.set_yticks(range(len(names)))
+        ax.set_yticklabels(names, fontsize=11)
+        ax.set_xlabel("Execution Time (ms)", fontsize=12)
+        ax.set_title(
+            "Top Function Execution Times",
+            fontsize=16,
+            fontweight="bold",
+            pad=20,
+        )
+
+        # Add value labels on bars
+        for i, (bar, time) in enumerate(zip(bars, times)):
+            # Format time nicely
+            if time >= 1000:
+                label = f"{time / 1000:.1f}s"
+            else:
+                label = f"{time:.0f}ms"
+
+            ax.text(
+                bar.get_width() * 1.02,
+                bar.get_y() + bar.get_height() / 2,
+                label,
+                va="center",
+                fontsize=10,
+                fontweight="bold",
+            )
+
+        # Remove top and right spines for cleaner look
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(True, alpha=0.3, axis="x", linestyle="--")
+
         plt.tight_layout()
         p = create_output_path(
-            output_path,
-            prefix,
-            "01b_operation_timers_by_total_time.png",
-            out_dir,
+            output_path, prefix, "01_function_timing.png", out_dir
         )
-        plt.savefig(p, dpi=200, bbox_inches="tight")
+        plt.savefig(p, dpi=300, bbox_inches="tight")
         plots_created.append(p)
         if show_plot:
             plt.show()
         plt.close()
 
-    # 2) Top timers by **call count** (as before; still useful)
-    if sorted_by_calls:
-        fig, ax = plt.subplots(figsize=(12, 8))
-        top = sorted_by_calls[:top_n]
-        names = [display_name(tid) for tid, _ in top]
-        calls = [
-            all_stats.get(tid, {"call_count": 0})["call_count"]
-            for tid, _ in top
-        ]
-        bars = ax.barh(range(len(names)), calls)
-        ax.set_yticks(range(len(names)))
-        ax.set_yticklabels([trunc(n, 60) for n in names], fontsize=10)
-        ax.set_xlabel("Call Count")
-        ax.set_title(f"Top {top_n} Timers by Call Count")
-        ax.grid(True, alpha=0.3, axis="x")
-        ax.set_xlim(0, max(calls) * 1.1 if calls else 1)
-        for i, b in enumerate(bars):
-            ax.text(
-                b.get_width() * 1.01,
-                b.get_y() + b.get_height() / 2,
-                f"{int(calls[i])}",
-                va="center",
-                fontsize=9,
+    # 2) Improved pie chart (single panel)
+    if sorted_functions:
+        print("Creating function distribution chart...")
+
+        fig, ax = plt.subplots(figsize=(10, 10))
+
+        # Take top 6 + others for better readability
+        top_items = sorted_functions[:6]
+        other_time = sum(st["total_time"] for _, st in sorted_functions[6:])
+
+        names = []
+        times = []
+
+        for tid, stats in top_items:
+            # Handle both regular and synthetic timer IDs
+            if tid in timer_db:
+                func_name = timer_db[tid].function
+            elif tid.startswith("SYNTHETIC:"):
+                func_name = tid.replace("SYNTHETIC:", "")
+            else:
+                func_name = "Unknown"
+            clean_name = (
+                func_name.replace("SYNTHETIC:", "").replace("_", " ").title()
             )
+            names.append(clean_name[:20])  # Limit length
+            times.append(stats["total_time"])
+
+        if other_time > 0:
+            names.append("Other Functions")
+            times.append(other_time)
+
+        # Use professional colors
+        colors = plt.cm.Set2(np.linspace(0, 1, len(names)))
+
+        # Create pie chart with clear separation
+        wedges, texts, autotexts = ax.pie(
+            times,
+            labels=names,
+            autopct="%1.1f%%",
+            startangle=90,
+            colors=colors,
+            textprops={"fontsize": 11, "fontweight": "bold"},
+            pctdistance=0.85,
+            labeldistance=1.1,
+        )
+
+        # Style the percentage labels
+        for autotext in autotexts:
+            autotext.set_color("white")
+            autotext.set_fontweight("bold")
+            autotext.set_fontsize(10)
+
+        ax.set_title(
+            "Function Execution Time Distribution",
+            fontsize=16,
+            fontweight="bold",
+            pad=20,
+        )
+
         plt.tight_layout()
         p = create_output_path(
-            output_path, prefix, "02_timers_by_call_count.png", out_dir
+            output_path, prefix, "02_function_distribution.png", out_dir
         )
-        plt.savefig(p, dpi=200, bbox_inches="tight")
+        plt.savefig(p, dpi=300, bbox_inches="tight")
         plots_created.append(p)
         if show_plot:
             plt.show()
         plt.close()
 
-    # 3) Major task categories over time (scatter), same as your original idea
-    if task_category_times:
-        fig, ax = plt.subplots(figsize=(12, 6))
-        major_categories = [
-            "gravity",
-            "dead time",
-            "drift",
-            "time integration",
-        ]
-        for category in major_categories:
-            if category in task_category_times:
-                times = task_category_times[category]
-                steps = range(len(times))
-                ax.scatter(
-                    steps, times, marker=".", s=10, alpha=0.7, label=category
+    # 3) Function efficiency chart (single panel)
+    if sorted_functions:
+        print("Creating function efficiency chart...")
+
+        fig, ax = plt.subplots(figsize=(12, 8))
+
+        # Calculate efficiency (time per call)
+        efficiency_data = []
+        for tid, stats in sorted_functions[:20]:
+            if stats["call_count"] > 0:
+                # Handle both regular and synthetic timer IDs
+                if tid in timer_db:
+                    func_name = timer_db[tid].function
+                elif tid.startswith("SYNTHETIC:"):
+                    func_name = tid.replace("SYNTHETIC:", "")
+                else:
+                    func_name = "Unknown"
+                clean_name = (
+                    func_name.replace("SYNTHETIC:", "")
+                    .replace("_", " ")
+                    .title()
                 )
-        ax.set_xlabel("Step Number")
-        ax.set_ylabel("Time (ms)")
-        ax.set_title("Major Task Categories Over Time")
-        ax.legend(fontsize=11)
-        ax.grid(True, alpha=0.3)
+                efficiency = stats["total_time"] / stats["call_count"]
+                efficiency_data.append(
+                    (clean_name, efficiency, stats["call_count"])
+                )
+
+        # Sort by efficiency
+        efficiency_data.sort(key=lambda x: x[1], reverse=True)
+        efficiency_data = efficiency_data[:15]  # Top 15
+
+        names = [item[0] for item in efficiency_data]
+        efficiencies = [item[1] for item in efficiency_data]
+        call_counts = [item[2] for item in efficiency_data]
+
+        # Color by call count
+        colors = plt.cm.RdYlBu_r(np.linspace(0.2, 0.8, len(names)))
+
+        bars = ax.barh(
+            range(len(names)),
+            efficiencies,
+            color=colors,
+            alpha=0.8,
+            edgecolor="white",
+            linewidth=0.5,
+        )
+
+        ax.set_yticks(range(len(names)))
+        ax.set_yticklabels(names, fontsize=11)
+        ax.set_xlabel("Average Time per Call (ms)", fontsize=12)
+        ax.set_title(
+            "Function Efficiency Analysis",
+            fontsize=16,
+            fontweight="bold",
+            pad=20,
+        )
+
+        # Add efficiency labels
+        for i, (bar, eff, calls) in enumerate(
+            zip(bars, efficiencies, call_counts)
+        ):
+            if eff >= 1:
+                label = f"{eff:.1f}ms ({calls} calls)"
+            else:
+                label = f"{eff:.2f}ms ({calls} calls)"
+            ax.text(
+                bar.get_width() * 1.02,
+                bar.get_y() + bar.get_height() / 2,
+                label,
+                va="center",
+                fontsize=9,
+            )
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(True, alpha=0.3, axis="x", linestyle="--")
+
         plt.tight_layout()
         p = create_output_path(
-            output_path, prefix, "03_task_categories_over_time.png", out_dir
+            output_path, prefix, "03_function_efficiency.png", out_dir
         )
-        plt.savefig(p, dpi=200, bbox_inches="tight")
+        plt.savefig(p, dpi=300, bbox_inches="tight")
         plots_created.append(p)
         if show_plot:
             plt.show()
         plt.close()
 
-    # 4) Timing distribution (violin) for top function timers
-    violin_data, violin_labels = [], []
-    for tid, _ in sorted_functions[:15]:
-        vals = function_times_by_tid.get(tid, [])
-        if len(vals) > 1:
-            violin_data.append(vals)
-            violin_labels.append(trunc(display_name(tid), 25))
-    if violin_data:
-        fig, ax = plt.subplots(figsize=(14, 8))
-        parts = ax.violinplot(
-            violin_data,
-            range(len(violin_data)),
-            showmeans=True,
-            showmedians=True,
+    # 4) Timer distribution histogram (single panel)
+    print("Creating timer distribution analysis...")
+
+    all_times = []
+    for stats in all_stats.values():
+        if stats["total_time"] > 0:
+            all_times.append(stats["total_time"])
+
+    if all_times:
+        fig, ax = plt.subplots(figsize=(12, 8))
+
+        # Create histogram with better binning
+        bins = np.logspace(
+            np.log10(min(all_times)), np.log10(max(all_times)), 30
         )
-        for pc in parts.get("bodies", []):
-            pc.set_alpha(0.7)
-        ax.set_xticks(range(len(violin_labels)))
-        ax.set_xticklabels(violin_labels, rotation=45, ha="right", fontsize=10)
-        ax.set_ylabel("Time (ms)")
-        ax.set_title("Timing Distribution for Top Function Timers")
-        ax.grid(True, alpha=0.3)
+        counts, bins, patches = ax.hist(
+            all_times,
+            bins=bins,
+            alpha=0.7,
+            color="steelblue",
+            edgecolor="white",
+            linewidth=0.5,
+        )
+
+        # Color gradient for histogram
+        colors = plt.cm.viridis(np.linspace(0, 1, len(patches)))
+        for patch, color in zip(patches, colors):
+            patch.set_facecolor(color)
+
+        ax.set_xlabel("Timer Duration (ms)", fontsize=12)
+        ax.set_ylabel("Number of Timers", fontsize=12)
+        ax.set_title(
+            "Distribution of Timer Execution Times",
+            fontsize=16,
+            fontweight="bold",
+            pad=20,
+        )
+        ax.set_xscale("log")
+
+        # Add statistics text
+        mean_time = np.mean(all_times)
+        median_time = np.median(all_times)
+        stats_text = (
+            f"Mean: {mean_time:.1f}ms\n"
+            f"Median: {median_time:.1f}ms\n"
+            f"Total Timers: {len(all_times)}"
+        )
+        ax.text(
+            0.7,
+            0.8,
+            stats_text,
+            transform=ax.transAxes,
+            fontsize=11,
+            bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
+        )
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.grid(True, alpha=0.3, linestyle="--")
+
         plt.tight_layout()
         p = create_output_path(
-            output_path, prefix, "04_timing_distribution.png", out_dir
+            output_path, prefix, "04_timer_distribution.png", out_dir
         )
-        plt.savefig(p, dpi=200, bbox_inches="tight")
+        plt.savefig(p, dpi=300, bbox_inches="tight")
         plots_created.append(p)
         if show_plot:
             plt.show()
         plt.close()
 
-    # 5) Task category pie (sum over observed entries)
+    # 5) Task category overview (single panel)
     if task_category_times:
-        fig, ax = plt.subplots(figsize=(10, 8))
+        print("Creating task category overview...")
+
+        fig, ax = plt.subplots(figsize=(12, 8))
+
+        # Calculate totals and get top categories
         cat_totals = {
             cat: sum(times)
             for cat, times in task_category_times.items()
             if times
         }
+
         if cat_totals:
+            # Sort and take meaningful categories
             items = sorted(
                 cat_totals.items(), key=lambda x: x[1], reverse=True
             )
-            items = items[:8]
-            labels = [k for k, _ in items]
-            sizes = [v for _, v in items]
-            wedges, texts, autotexts = ax.pie(
-                sizes, labels=labels, autopct="%1.1f%%", startangle=90
-            )
-            ax.set_title("Time Distribution by Task Category")
-            for at in autotexts:
-                at.set_color("white")
-                at.set_fontweight("bold")
-            plt.tight_layout()
-            p = create_output_path(
-                output_path, prefix, "05_task_category_pie.png", out_dir
-            )
-            plt.savefig(p, dpi=200, bbox_inches="tight")
-            plots_created.append(p)
-            if show_plot:
-                plt.show()
-        plt.close()
+            # Filter out very small categories
+            total_time = sum(cat_totals.values())
+            items = [
+                (cat, time) for cat, time in items if time > total_time * 0.001
+            ][:8]
 
-    # 6) Top task categories over time (log y)
-    if task_category_times:
-        fig, ax = plt.subplots(figsize=(12, 8))
-        cat_totals = {
-            c: sum(t)
-            for c, t in task_category_times.items()
-            if c.lower() != "total"
-        }
-        top_cats = sorted(
-            cat_totals.items(), key=lambda x: x[1], reverse=True
-        )[:6]
-        for c, _ in top_cats:
-            times = task_category_times[c]
-            steps = range(len(times))
-            ax.scatter(steps, times, marker=".", s=10, alpha=0.7, label=c)
-        ax.set_xlabel("Step Number")
-        ax.set_ylabel("Time (ms)")
-        ax.set_yscale("log")
-        ax.set_title("Top Task Categories Over Time")
-        ax.legend(fontsize=11)
-        ax.grid(True, alpha=0.3)
-        plt.tight_layout()
-        p = create_output_path(
-            output_path, prefix, "06_top_tasks_over_time.png", out_dir
-        )
-        plt.savefig(p, dpi=200, bbox_inches="tight")
-        plots_created.append(p)
-        if show_plot:
-            plt.show()
-        plt.close()
+            categories = [item[0].replace("_", " ").title() for item in items]
+            times = [item[1] for item in items]
 
-    # 7) "Efficiency" plot — average time per call for function timers
-    if sorted_functions:
-        fig, ax = plt.subplots(figsize=(12, 8))
-        eff = []
-        for tid, s in sorted_functions[:20]:
-            calls = s["call_count"]
-            val = (s["total_time"] / calls) if calls > 0 else 0.0
-            eff.append((tid, val))
-        eff.sort(key=lambda x: x[1], reverse=True)
-        names = [trunc(display_name(tid), 35) for tid, _ in eff]
-        values = [v for _, v in eff]
-        bars = ax.barh(range(len(names)), values)
-        ax.set_yticks(range(len(names)))
-        ax.set_yticklabels(names, fontsize=10)
-        ax.set_xlabel("Average Time per Call (ms)")
-        ax.set_title("Function Timer Efficiency (Time per Call)")
-        ax.grid(True, alpha=0.3, axis="x")
-        ax.set_xlim(0, max(values) * 1.1 if values else 1)
-        for i, b in enumerate(bars):
-            ax.text(
-                b.get_width() * 1.01,
-                b.get_y() + b.get_height() / 2,
-                f"{values[i]:.2f}ms",
-                va="center",
-                fontsize=9,
-            )
-        plt.tight_layout()
-        p = create_output_path(
-            output_path, prefix, "07_function_efficiency.png", out_dir
-        )
-        plt.savefig(p, dpi=200, bbox_inches="tight")
-        plots_created.append(p)
-        if show_plot:
-            plt.show()
-        plt.close()
+            # Professional color scheme
+            colors = plt.cm.Dark2(np.linspace(0, 1, len(categories)))
 
-    # 8) Cumulative time analysis for all timers
-    if sorted_all:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        top = sorted_all[:25]
-        cum = np.cumsum([s["total_time"] for _, s in top])
-        pct = 100 * cum / cum[-1] if cum[-1] > 0 else cum
-        ax.plot(range(1, len(pct) + 1), pct, "ro-", linewidth=2, markersize=4)
-        ax.set_xlabel("Number of Top Timers")
-        ax.set_ylabel("Cumulative % of Total Time")
-        ax.set_title("Cumulative Time Distribution")
-        ax.grid(True, alpha=0.3)
-        ax.axhline(
-            y=80,
-            color="r",
-            linestyle="--",
-            alpha=0.7,
-            linewidth=2,
-            label="80% threshold",
-        )
-        ax.axhline(
-            y=90,
-            color="orange",
-            linestyle="--",
-            alpha=0.7,
-            linewidth=2,
-            label="90% threshold",
-        )
-        ax.legend(fontsize=11)
-        plt.tight_layout()
-        p = create_output_path(
-            output_path, prefix, "08_cumulative_time_analysis.png", out_dir
-        )
-        plt.savefig(p, dpi=200, bbox_inches="tight")
-        plots_created.append(p)
-        if show_plot:
-            plt.show()
-        plt.close()
-
-    # 9) Task counts over time (log y), excluding 'skipped'/'none' if present
-    if task_counts:
-        fig, ax = plt.subplots(figsize=(14, 8))
-        task_max = {}
-        for tname, counts in task_counts.items():
-            if counts and tname not in ("skipped", "none") and max(counts) > 0:
-                task_max[tname] = max(counts)
-        top_types = sorted(task_max.items(), key=lambda x: x[1], reverse=True)[
-            :10
-        ]
-        for tname, _ in top_types:
-            counts = task_counts[tname]
-            steps = range(len(counts))
-            ax.scatter(steps, counts, marker=".", s=10, alpha=0.7, label=tname)
-        ax.set_xlabel("Step Number")
-        ax.set_ylabel("Task Count")
-        ax.set_yscale("log")
-        ax.set_title("Top Task Types Over Time")
-        ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=10)
-        ax.grid(True, alpha=0.3)
-        plt.tight_layout()
-        p = create_output_path(
-            output_path, prefix, "09_task_counts_over_time.png", out_dir
-        )
-        plt.savefig(p, dpi=200, bbox_inches="tight")
-        plots_created.append(p)
-        if show_plot:
-            plt.show()
-        plt.close()
-
-    # 10) Function vs Operation timers comparison
-    if sorted_functions and sorted_operations:
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
-
-        # Function timers subplot
-        top_func = sorted_functions[: min(top_n // 2, 10)]
-        func_names = [trunc(display_name(tid), 40) for tid, _ in top_func]
-        func_totals = [st["total_time"] for _, st in top_func]
-        ax1.barh(range(len(func_names)), func_totals, color="skyblue")
-        ax1.set_yticks(range(len(func_names)))
-        ax1.set_yticklabels(func_names, fontsize=9)
-        ax1.set_xlabel("Total Time (ms)")
-        ax1.set_title("Top Function Timers")
-        ax1.set_xscale("log")
-        ax1.grid(True, alpha=0.3, axis="x")
-
-        # Operation timers subplot
-        top_op = sorted_operations[: min(top_n // 2, 10)]
-        op_names = [trunc(display_name(tid), 40) for tid, _ in top_op]
-        op_totals = [st["total_time"] for _, st in top_op]
-        ax2.barh(range(len(op_names)), op_totals, color="lightcoral")
-        ax2.set_yticks(range(len(op_names)))
-        ax2.set_yticklabels(op_names, fontsize=9)
-        ax2.set_xlabel("Total Time (ms)")
-        ax2.set_title("Top Operation Timers")
-        ax2.set_xscale("log")
-        ax2.grid(True, alpha=0.3, axis="x")
-
-        plt.tight_layout()
-        p = create_output_path(
-            output_path, prefix, "10_function_vs_operation_timers.png", out_dir
-        )
-        plt.savefig(p, dpi=200, bbox_inches="tight")
-        plots_created.append(p)
-        if show_plot:
-            plt.show()
-        plt.close()
-
-    # 11) Hierarchical call graph visualization
-    if nesting_db:
-        try:
-            # Build the call graph
-            G = nx.DiGraph()
-
-            # Add nodes and edges from nesting database
-            for func_name, data in nesting_db.items():
-                if (
-                    func_name in function_stats
-                ):  # Only include functions that actually ran
-                    func_time = function_stats[func_name]["total_time"]
-                    G.add_node(func_name, time=func_time, type="function")
-
-                    # Add edges to nested functions
-                    for nested_func in data.get("nested_functions", []):
-                        if nested_func in function_stats:
-                            nested_time = function_stats[nested_func][
-                                "total_time"
-                            ]
-                            G.add_node(
-                                nested_func, time=nested_time, type="function"
-                            )
-                            G.add_edge(func_name, nested_func)
-
-            if len(G.nodes()) > 1:
-                fig, ax = plt.subplots(figsize=(16, 12))
-
-                # Use hierarchical layout
-                try:
-                    pos = nx.spring_layout(G, k=3, iterations=50)
-                except Exception:
-                    pos = nx.circular_layout(G)
-
-                # Node sizes based on timing (log scale)
-                times = [G.nodes[node].get("time", 1) for node in G.nodes()]
-                max_time = max(times) if times else 1
-                node_sizes = [
-                    1000 * (time / max_time) ** 0.5 for time in times
-                ]
-
-                # Draw the graph
-                nx.draw_networkx_nodes(
-                    G,
-                    pos,
-                    node_size=node_sizes,
-                    node_color="lightblue",
-                    alpha=0.7,
-                    ax=ax,
-                )
-                nx.draw_networkx_edges(
-                    G,
-                    pos,
-                    edge_color="gray",
-                    arrows=True,
-                    arrowsize=20,
-                    alpha=0.6,
-                    ax=ax,
-                )
-
-                # Add labels
-                labels = {
-                    node: f"{node}\\n{G.nodes[node].get('time', 0):.1f}ms"
-                    for node in G.nodes()
-                }
-                nx.draw_networkx_labels(G, pos, labels, font_size=8, ax=ax)
-
-                ax.set_title(
-                    "Function Call Graph (Node size ∝ execution time)",
-                    fontsize=14,
-                )
-                ax.axis("off")
-
-                plt.tight_layout()
-                p = create_output_path(
-                    output_path,
-                    prefix,
-                    "11_hierarchical_call_graph.png",
-                    out_dir,
-                )
-                plt.savefig(p, dpi=200, bbox_inches="tight")
-                plots_created.append(p)
-                if show_plot:
-                    plt.show()
-                plt.close()
-        except ImportError:
-            print("NetworkX not available, skipping call graph visualization")
-        except Exception as e:
-            print(f"Failed to create call graph: {e}")
-
-    # 12) Hierarchical timing breakdown (treemap style using matplotlib)
-    if nesting_db and function_stats:
-        try:
-            # Get top-level functions (those not called by others)
-            all_nested = set()
-            for func_data in nesting_db.values():
-                all_nested.update(func_data.get("nested_functions", []))
-
-            top_level_funcs = []
-            for func_name in function_stats.keys():
-                if func_name not in all_nested and func_name in nesting_db:
-                    top_level_funcs.append(func_name)
-
-            if top_level_funcs:
-                # Create treemap data
-                treemap_data = []
-                treemap_labels = []
-
-                for func_name in sorted(
-                    top_level_funcs,
-                    key=lambda x: function_stats[x]["total_time"],
-                    reverse=True,
-                )[:10]:  # Top 10
-                    func_time = function_stats[func_name]["total_time"]
-                    treemap_data.append(func_time)
-                    treemap_labels.append(f"{func_name}\\n{func_time:.1f}ms")
-
-                if treemap_data:
-                    fig, ax = plt.subplots(figsize=(14, 10))
-
-                    # Create treemap
-                    colors = plt.cm.Set3(np.linspace(0, 1, len(treemap_data)))
-                    squarify.plot(
-                        sizes=treemap_data,
-                        label=treemap_labels,
-                        color=colors,
-                        alpha=0.8,
-                        ax=ax,
-                    )
-
-                    ax.set_title(
-                        "Top-Level Function Timing Breakdown (Treemap)",
-                        fontsize=14,
-                    )
-                    ax.axis("off")
-
-                    plt.tight_layout()
-                    p = create_output_path(
-                        output_path, prefix, "12_timing_treemap.png", out_dir
-                    )
-                    plt.savefig(p, dpi=200, bbox_inches="tight")
-                    plots_created.append(p)
-                    if show_plot:
-                        plt.show()
-                    plt.close()
-        except ImportError:
-            print("Squarify not available, skipping treemap visualization")
-        except Exception as e:
-            print(f"Failed to create treemap: {e}")
-
-    # 13) Nesting depth analysis
-    if nesting_db and function_stats:
-        # Calculate nesting depths
-        def calculate_depth(func_name, visited=None):
-            if visited is None:
-                visited = set()
-            if func_name in visited:
-                return 0
-            visited.add(func_name)
-
-            nested_funcs = nesting_db.get(func_name, {}).get(
-                "nested_functions", []
-            )
-            if not nested_funcs:
-                return 1
-
-            max_depth = 0
-            for nested in nested_funcs:
-                if nested in nesting_db:
-                    depth = calculate_depth(nested, visited.copy())
-                    max_depth = max(max_depth, depth)
-
-            return max_depth + 1
-
-        depth_data = {}
-        for func_name in function_stats.keys():
-            if func_name in nesting_db:
-                depth = calculate_depth(func_name)
-                depth_data[func_name] = {
-                    "depth": depth,
-                    "time": function_stats[func_name]["total_time"],
-                }
-
-        if depth_data:
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
-
-            # Depth distribution
-            depths = [data["depth"] for data in depth_data.values()]
-            ax1.hist(
-                depths,
-                bins=range(1, max(depths) + 2),
-                alpha=0.7,
-                edgecolor="black",
-            )
-            ax1.set_xlabel("Nesting Depth")
-            ax1.set_ylabel("Number of Functions")
-            ax1.set_title("Function Nesting Depth Distribution")
-            ax1.grid(True, alpha=0.3)
-
-            # Time vs depth scatter
-            depths = [data["depth"] for data in depth_data.values()]
-            times = [data["time"] for data in depth_data.values()]
-            ax2.scatter(depths, times, alpha=0.6)
-            ax2.set_xlabel("Nesting Depth")
-            ax2.set_ylabel("Total Time (ms)")
-            ax2.set_title("Execution Time vs Nesting Depth")
-            ax2.set_yscale("log")
-            ax2.grid(True, alpha=0.3)
-
-            plt.tight_layout()
-            p = create_output_path(
-                output_path, prefix, "13_nesting_depth_analysis.png", out_dir
-            )
-            plt.savefig(p, dpi=200, bbox_inches="tight")
-            plots_created.append(p)
-            if show_plot:
-                plt.show()
-            plt.close()
-
-    # 14) Function efficiency analysis (time per call vs nesting level)
-    if nesting_db and function_stats:
-        # Get all nested functions at each level
-        level_data = {}
-
-        def categorize_by_level(func_name, level=0, visited=None):
-            if visited is None:
-                visited = set()
-            if func_name in visited or func_name not in function_stats:
-                return
-            visited.add(func_name)
-
-            if level not in level_data:
-                level_data[level] = []
-
-            func_stats = function_stats[func_name]
-            time_per_call = func_stats["total_time"] / max(
-                func_stats["call_count"], 1
-            )
-            level_data[level].append(
-                {
-                    "name": func_name,
-                    "time_per_call": time_per_call,
-                    "total_time": func_stats["total_time"],
-                }
-            )
-
-            # Recurse to nested functions
-            nested_funcs = nesting_db.get(func_name, {}).get(
-                "nested_functions", []
-            )
-            for nested in nested_funcs:
-                categorize_by_level(nested, level + 1, visited.copy())
-
-        # Start from top-level functions
-        all_nested = set()
-        for func_data in nesting_db.values():
-            all_nested.update(func_data.get("nested_functions", []))
-
-        for func_name in function_stats.keys():
-            if func_name not in all_nested and func_name in nesting_db:
-                categorize_by_level(func_name)
-
-        if level_data:
-            fig, ax = plt.subplots(figsize=(14, 8))
-
-            # Create box plot of efficiency by level
-            levels = sorted(level_data.keys())
-            efficiency_data = []
-            labels = []
-
-            for level in levels:
-                if level_data[level]:
-                    efficiencies = [
-                        item["time_per_call"] for item in level_data[level]
-                    ]
-                    efficiency_data.append(efficiencies)
-                    labels.append(
-                        f"Level {level}\\n({len(efficiencies)} funcs)"
-                    )
-
-            if efficiency_data:
-                box_plot = ax.boxplot(
-                    efficiency_data, labels=labels, patch_artist=True
-                )
-
-                # Color boxes
-                colors = plt.cm.viridis(
-                    np.linspace(0, 1, len(box_plot["boxes"]))
-                )
-                for patch, color in zip(box_plot["boxes"], colors):
-                    patch.set_facecolor(color)
-                    patch.set_alpha(0.7)
-
-                ax.set_ylabel("Time per Call (ms)")
-                ax.set_xlabel("Nesting Level")
-                ax.set_title("Function Efficiency by Nesting Level")
-                ax.set_yscale("log")
-                ax.grid(True, alpha=0.3)
-
-                plt.tight_layout()
-                p = create_output_path(
-                    output_path,
-                    prefix,
-                    "14_efficiency_by_nesting_level.png",
-                    out_dir,
-                )
-                plt.savefig(p, dpi=200, bbox_inches="tight")
-                plots_created.append(p)
-                if show_plot:
-                    plt.show()
-                plt.close()
-
-    # 15) Comparative analysis: Flat vs Hierarchical timing
-    if nesting_db and function_stats:
-        # Calculate "exclusive" time (time not spent in nested functions)
-        exclusive_times = {}
-
-        for func_name, stats in function_stats.items():
-            if func_name in nesting_db:
-                total_time = stats["total_time"]
-
-                # Subtract time spent in nested functions
-                nested_time = 0
-                nested_funcs = nesting_db.get(func_name, {}).get(
-                    "nested_functions", []
-                )
-                for nested_func in nested_funcs:
-                    if nested_func in function_stats:
-                        nested_time += function_stats[nested_func][
-                            "total_time"
-                        ]
-
-                exclusive_time = max(0, total_time - nested_time)
-                exclusive_times[func_name] = {
-                    "total": total_time,
-                    "exclusive": exclusive_time,
-                    "nested": nested_time,
-                }
-
-        if exclusive_times:
-            # Get top functions by total time
-            top_funcs = sorted(
-                exclusive_times.items(),
-                key=lambda x: x[1]["total"],
-                reverse=True,
-            )[:15]
-
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
-
-            # Stacked bar chart: exclusive vs nested time
-            func_names = [item[0] for item in top_funcs]
-            exclusive = [item[1]["exclusive"] for item in top_funcs]
-            nested = [item[1]["nested"] for item in top_funcs]
-
-            y_pos = np.arange(len(func_names))
-
-            ax1.barh(
-                y_pos,
-                exclusive,
-                label="Exclusive Time",
+            bars = ax.bar(
+                range(len(categories)),
+                times,
+                color=colors,
                 alpha=0.8,
-                color="steelblue",
+                edgecolor="white",
+                linewidth=1,
             )
-            ax1.barh(
-                y_pos,
-                nested,
-                left=exclusive,
-                label="Nested Function Time",
-                alpha=0.8,
-                color="lightcoral",
-            )
-
-            ax1.set_yticks(y_pos)
-            ax1.set_yticklabels(
-                [
-                    name[:25] + ("..." if len(name) > 25 else "")
-                    for name in func_names
-                ]
-            )
-            ax1.set_xlabel("Time (ms)")
-            ax1.set_title("Function Time Breakdown: Exclusive vs Nested")
-            ax1.legend()
-            ax1.grid(True, alpha=0.3, axis="x")
-
-            # Efficiency comparison: exclusive time vs call count
-            all_exclusive = [
-                item[1]["exclusive"] for item in exclusive_times.items()
-            ]
-            all_total = [item[1]["total"] for item in exclusive_times.items()]
-            all_calls = [
-                function_stats[name]["call_count"]
-                for name in exclusive_times.keys()
-            ]
-
-            # Time per call for exclusive time
-            exclusive_per_call = [
-                exc / max(calls, 1)
-                for exc, calls in zip(all_exclusive, all_calls)
-            ]
-            total_per_call = [
-                tot / max(calls, 1) for tot, calls in zip(all_total, all_calls)
-            ]
-
-            ax2.scatter(total_per_call, exclusive_per_call, alpha=0.6, s=60)
-            ax2.set_xlabel("Total Time per Call (ms)")
-            ax2.set_ylabel("Exclusive Time per Call (ms)")
-            ax2.set_title(
-                "Function Efficiency: Total vs Exclusive Time per Call"
-            )
-            ax2.set_xscale("log")
-            ax2.set_yscale("log")
-            ax2.grid(True, alpha=0.3)
-
-            # Add diagonal line
-            min_val = min(min(total_per_call), min(exclusive_per_call))
-            max_val = max(max(total_per_call), max(exclusive_per_call))
-            ax2.plot(
-                [min_val, max_val],
-                [min_val, max_val],
-                "r--",
-                alpha=0.5,
-                label="y=x",
-            )
-            ax2.legend()
-
-            plt.tight_layout()
-            p = create_output_path(
-                output_path,
-                prefix,
-                "15_flat_vs_hierarchical_timing.png",
-                out_dir,
-            )
-            plt.savefig(p, dpi=200, bbox_inches="tight")
-            plots_created.append(p)
-            if show_plot:
-                plt.show()
-            plt.close()
-
-    # 16) Function call hierarchy treemap visualization
-    if nesting_db and function_stats:
-        try:
-            # Build hierarchical data for treemap
-            def build_treemap_data():
-                treemap_data = []
-
-                # Find top-level functions (not nested in others)
-                all_nested = set()
-                for func_data in nesting_db.values():
-                    all_nested.update(func_data.get("nested_functions", []))
-
-                top_level_funcs = [
-                    func
-                    for func in function_stats.keys()
-                    if func not in all_nested and func in nesting_db
-                ]
-
-                for func_name in sorted(
-                    top_level_funcs,
-                    key=lambda x: function_stats[x]["total_time"],
-                    reverse=True,
-                )[:8]:  # Top 8 for readability
-                    func_time = function_stats[func_name]["total_time"]
-
-                    # Add main function
-                    treemap_data.append(
-                        {
-                            "label": func_name[:20]
-                            + ("..." if len(func_name) > 20 else ""),
-                            "size": func_time,
-                            "color": "steelblue",
-                            "alpha": 0.8,
-                        }
-                    )
-
-                    # Add nested functions
-                    nested_funcs = nesting_db.get(func_name, {}).get(
-                        "nested_functions", []
-                    )
-                    for nested_func in nested_funcs[
-                        :3
-                    ]:  # Top 3 nested for each
-                        if nested_func in function_stats:
-                            nested_time = function_stats[nested_func][
-                                "total_time"
-                            ]
-                            treemap_data.append(
-                                {
-                                    "label": f"  {nested_func[:15]}..."
-                                    if len(nested_func) > 15
-                                    else f"  {nested_func}",
-                                    "size": nested_time
-                                    * 0.8,  # Scale down to show hierarchy
-                                    "color": "lightcoral",
-                                    "alpha": 0.6,
-                                }
-                            )
-
-                return treemap_data
-
-            treemap_data = build_treemap_data()
-
-            if treemap_data:
-                fig, ax = plt.subplots(figsize=(16, 10))
-
-                sizes = [item["size"] for item in treemap_data]
-                labels = [
-                    f"{item['label']}\n{item['size']:.1f}ms"
-                    for item in treemap_data
-                ]
-                colors = [item["color"] for item in treemap_data]
-
-                # Create treemap
-                squarify.plot(
-                    sizes=sizes, label=labels, color=colors, alpha=0.7, ax=ax
-                )
-
-                ax.set_title(
-                    "Function Call Hierarchy (Treemap View)",
-                    fontsize=16,
-                    pad=20,
-                )
-                ax.axis("off")
-
-                plt.tight_layout()
-                p = create_output_path(
-                    output_path,
-                    prefix,
-                    "16_function_hierarchy_treemap.png",
-                    out_dir,
-                )
-                plt.savefig(p, dpi=200, bbox_inches="tight")
-                plots_created.append(p)
-                if show_plot:
-                    plt.show()
-                plt.close()
-
-        except ImportError:
-            # squarify not available, skip this plot
-            pass
-
-    # 17) Hierarchical function timing breakdown (waterfall chart)
-    if nesting_db and function_stats:
-        # Find a good example function with multiple levels of nesting
-        best_func = None
-        max_nested_count = 0
-
-        for func_name in function_stats.keys():
-            if func_name in nesting_db:
-                nested_count = len(
-                    nesting_db[func_name].get("nested_functions", [])
-                )
-                if nested_count > max_nested_count:
-                    max_nested_count = nested_count
-                    best_func = func_name
-
-        if best_func and max_nested_count > 0:
-            fig, ax = plt.subplots(figsize=(14, 10))
-
-            # Build waterfall data
-            func_time = function_stats[best_func]["total_time"]
-            nested_funcs = nesting_db[best_func].get("nested_functions", [])
-
-            # Calculate exclusive time
-            nested_time = sum(
-                function_stats.get(nf, {"total_time": 0})["total_time"]
-                for nf in nested_funcs
-                if nf in function_stats
-            )
-            exclusive_time = max(0, func_time - nested_time)
-
-            # Prepare data for waterfall
-            categories = [f"{best_func}\n(Total)"]
-            values = [func_time]
-            colors = ["steelblue"]
-
-            categories.append(f"{best_func}\n(Exclusive)")
-            values.append(-exclusive_time)
-            colors.append("lightcoral")
-
-            # Add nested functions
-            for nf in sorted(
-                nested_funcs,
-                key=lambda x: function_stats.get(x, {"total_time": 0})[
-                    "total_time"
-                ],
-                reverse=True,
-            )[:6]:  # Top 6 nested
-                if nf in function_stats:
-                    categories.append(
-                        f"{nf[:15]}...\n(Nested)"
-                        if len(nf) > 15
-                        else f"{nf}\n(Nested)"
-                    )
-                    values.append(-function_stats[nf]["total_time"])
-                    colors.append("orange")
-
-            # Create waterfall chart
-            cumulative = []
-            running_total = 0
-            for i, val in enumerate(values):
-                if i == 0:
-                    cumulative.append(val)
-                    running_total = val
-                else:
-                    cumulative.append(running_total)
-                    running_total += val
-
-            # Plot bars
-            for i, (cat, val, color, cum) in enumerate(
-                zip(categories, values, colors, cumulative)
-            ):
-                if i == 0:
-                    ax.bar(i, val, color=color, alpha=0.8)
-                else:
-                    ax.bar(
-                        i,
-                        abs(val),
-                        bottom=cum - abs(val),
-                        color=color,
-                        alpha=0.8,
-                    )
-
-                # Add value labels
-                if i == 0:
-                    ax.text(
-                        i,
-                        val / 2,
-                        f"{val:.1f}ms",
-                        ha="center",
-                        va="center",
-                        fontweight="bold",
-                    )
-                else:
-                    ax.text(
-                        i,
-                        cum - abs(val) / 2,
-                        f"{abs(val):.1f}ms",
-                        ha="center",
-                        va="center",
-                        fontsize=9,
-                    )
 
             ax.set_xticks(range(len(categories)))
-            ax.set_xticklabels(categories, rotation=45, ha="right")
-            ax.set_ylabel("Time (ms)")
+            ax.set_xticklabels(
+                categories, rotation=45, ha="right", fontsize=11
+            )
+            ax.set_ylabel("Total Time (ms)", fontsize=12)
             ax.set_title(
-                f"Hierarchical Timing Breakdown: {best_func}",
-                fontsize=14,
+                "Task Category Performance Overview",
+                fontsize=16,
+                fontweight="bold",
                 pad=20,
             )
-            ax.grid(True, alpha=0.3, axis="y")
+
+            # Add value labels on bars
+            for bar, time in zip(bars, times):
+                height = bar.get_height()
+                if time >= 1000:
+                    label = f"{time / 1000:.1f}s"
+                else:
+                    label = f"{time:.0f}ms"
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    height + height * 0.01,
+                    label,
+                    ha="center",
+                    va="bottom",
+                    fontsize=10,
+                    fontweight="bold",
+                )
+
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            ax.grid(True, alpha=0.3, axis="y", linestyle="--")
 
             plt.tight_layout()
             p = create_output_path(
-                output_path,
-                prefix,
-                "17_hierarchical_timing_breakdown.png",
-                out_dir,
+                output_path, prefix, "05_task_categories.png", out_dir
             )
-            plt.savefig(p, dpi=200, bbox_inches="tight")
+            plt.savefig(p, dpi=300, bbox_inches="tight")
             plots_created.append(p)
             if show_plot:
                 plt.show()
             plt.close()
 
-    # 18) Function nesting depth analysis
-    if nesting_db and function_stats:
+    # 6) Time series plots showing function evolution over steps (single panel)
+    print("Creating time series analysis...")
 
-        def calculate_nesting_depth(func_name, visited=None):
-            if visited is None:
-                visited = set()
-            if func_name in visited:
-                return 0  # Avoid cycles
-            visited.add(func_name)
+    # Collect time series data for top functions
+    steps_with_data = sorted(
+        [k for k in instances_by_step.keys() if k is not None]
+    )
+    if len(steps_with_data) > 1 and function_stats:
+        fig, ax = plt.subplots(figsize=(14, 8))
 
-            if func_name not in nesting_db:
-                return 0
+        # Get top 8 functions by total time for time series
+        top_functions = sorted(
+            function_stats.items(),
+            key=lambda x: x[1]["total_time"],
+            reverse=True,
+        )[:8]
 
-            nested_funcs = nesting_db[func_name].get("nested_functions", [])
-            if not nested_funcs:
-                return 0
+        colors = plt.cm.Set1(np.linspace(0, 1, len(top_functions)))
 
-            max_depth = 0
-            for nested_func in nested_funcs:
-                depth = calculate_nesting_depth(nested_func, visited.copy())
-                max_depth = max(max_depth, depth + 1)
+        for i, (tid, stats) in enumerate(top_functions):
+            # Collect execution times per step for this function
+            step_times = []
+            step_numbers = []
 
-            return max_depth
+            for step in steps_with_data:
+                # Sum all instances of this timer in this step
+                step_total = sum(
+                    inst.time_ms
+                    for inst in instances_by_step[step]
+                    if inst.timer_id == tid
+                )
+                step_times.append(step_total)
+                step_numbers.append(step)
 
-        # Calculate depths and group functions
-        depth_data = {}
-        for func_name in function_stats.keys():
-            if func_name in nesting_db:
-                depth = calculate_nesting_depth(func_name)
-                if depth not in depth_data:
-                    depth_data[depth] = []
-                depth_data[depth].append(
+            # Get function name for display
+            if tid in timer_db:
+                func_name = timer_db[tid].function
+                clean_name = func_name.replace("_", " ").title()
+            else:
+                clean_name = "Unknown Function"
+
+            # Plot the time series
+            ax.plot(
+                step_numbers,
+                step_times,
+                "o-",
+                color=colors[i],
+                linewidth=2,
+                markersize=6,
+                alpha=0.8,
+                label=clean_name,
+            )
+
+        ax.set_xlabel("Simulation Step", fontsize=12)
+        ax.set_ylabel("Execution Time (ms)", fontsize=12)
+        ax.set_title(
+            "Function Execution Times Over Simulation Steps",
+            fontsize=16,
+            fontweight="bold",
+            pad=20,
+        )
+        ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=10)
+        ax.grid(True, alpha=0.3, linestyle="--")
+        ax.set_yscale(
+            "log"
+        )  # Log scale for better visibility of different magnitudes
+
+        # Remove top and right spines
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        plt.tight_layout()
+        p = create_output_path(
+            output_path, prefix, "07_time_series.png", out_dir
+        )
+        plt.savefig(p, dpi=300, bbox_inches="tight")
+        plots_created.append(p)
+        if show_plot:
+            plt.show()
+        plt.close()
+
+    # 7) Function timing variability analysis (single panel)
+    print("Creating timing variability analysis...")
+
+    if len(steps_with_data) > 2 and function_stats:
+        fig, ax = plt.subplots(figsize=(12, 8))
+
+        # Calculate coefficient of variation for each function
+        variability_data = []
+        for tid, stats in function_stats.items():
+            if (
+                stats["call_count"] > 2
+            ):  # Need multiple calls to calculate variability
+                # Get all execution times for this function
+                all_times = []
+                for step in steps_with_data:
+                    step_times = [
+                        inst.time_ms
+                        for inst in instances_by_step[step]
+                        if inst.timer_id == tid
+                    ]
+                    all_times.extend(step_times)
+
+                if len(all_times) > 2 and np.mean(all_times) > 0:
+                    cv = (
+                        np.std(all_times) / np.mean(all_times) * 100
+                    )  # Coefficient of variation as %
+                    func_name = (
+                        timer_db[tid].function
+                        if tid in timer_db
+                        else "Unknown"
+                    )
+                    clean_name = func_name.replace("_", " ").title()
+                    variability_data.append(
+                        (clean_name, cv, stats["total_time"])
+                    )
+
+        if variability_data:
+            # Sort by coefficient of variation
+            variability_data.sort(key=lambda x: x[1], reverse=True)
+            variability_data = variability_data[:15]  # Top 15 most variable
+
+            names = [item[0] for item in variability_data]
+            cvs = [item[1] for item in variability_data]
+            total_times = [item[2] for item in variability_data]
+
+            # Color by total execution time
+            colors = plt.cm.plasma(np.linspace(0.1, 0.9, len(names)))
+
+            bars = ax.barh(
+                range(len(names)),
+                cvs,
+                color=colors,
+                alpha=0.8,
+                edgecolor="white",
+                linewidth=0.5,
+            )
+
+            ax.set_yticks(range(len(names)))
+            ax.set_yticklabels(names, fontsize=11)
+            ax.set_xlabel("Coefficient of Variation (%)", fontsize=12)
+            ax.set_title(
+                "Function Timing Variability (Higher = More Variable)",
+                fontsize=16,
+                fontweight="bold",
+                pad=20,
+            )
+
+            # Add CV% labels on bars
+            for i, (bar, cv, total_time) in enumerate(
+                zip(bars, cvs, total_times)
+            ):
+                label = f"{cv:.1f}%"
+                ax.text(
+                    bar.get_width() * 1.02,
+                    bar.get_y() + bar.get_height() / 2,
+                    label,
+                    va="center",
+                    fontsize=10,
+                )
+
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            ax.grid(True, alpha=0.3, axis="x", linestyle="--")
+
+            plt.tight_layout()
+            p = create_output_path(
+                output_path, prefix, "08_timing_variability.png", out_dir
+            )
+            plt.savefig(p, dpi=300, bbox_inches="tight")
+            plots_created.append(p)
+            if show_plot:
+                plt.show()
+            plt.close()
+
+    # 8) Performance summary scatter plot (single panel)
+    if function_stats:
+        print("Creating performance summary...")
+
+        fig, ax = plt.subplots(figsize=(12, 8))
+
+        # Prepare data for scatter plot
+        scatter_data = []
+        for tid, stats in function_stats.items():
+            if (
+                stats["call_count"] > 0 and stats["total_time"] > 1
+            ):  # Filter very small timers
+                # Handle both regular and synthetic timer IDs
+                if tid in timer_db:
+                    func_name = timer_db[tid].function
+                elif tid.startswith("SYNTHETIC:"):
+                    func_name = tid.replace("SYNTHETIC:", "")
+                else:
+                    func_name = "Unknown"
+                avg_duration = stats["total_time"] / stats["call_count"]
+                scatter_data.append(
                     {
-                        "name": func_name,
-                        "time": function_stats[func_name]["total_time"],
-                        "calls": function_stats[func_name]["call_count"],
+                        "name": func_name.replace("SYNTHETIC:", "")
+                        .replace("_", " ")
+                        .title(),
+                        "calls": stats["call_count"],
+                        "avg_duration": avg_duration,
+                        "total_time": stats["total_time"],
                     }
                 )
 
-        if depth_data:
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+        if scatter_data:
+            calls = [item["calls"] for item in scatter_data]
+            avg_durations = [item["avg_duration"] for item in scatter_data]
+            total_times = [item["total_time"] for item in scatter_data]
 
-            # Left plot: Total time by depth
-            depths = sorted(depth_data.keys())
-            depth_times = []
-            depth_counts = []
+            # Create scatter plot with size proportional to total time
+            sizes = np.array(total_times)
+            sizes = (sizes / sizes.max()) * 300 + 20  # Scale for visibility
 
-            for depth in depths:
-                total_time = sum(item["time"] for item in depth_data[depth])
-                count = len(depth_data[depth])
-                depth_times.append(total_time)
-                depth_counts.append(count)
-
-            bars1 = ax1.bar(depths, depth_times, alpha=0.8, color="steelblue")
-            ax1.set_xlabel("Nesting Depth")
-            ax1.set_ylabel("Total Time (ms)")
-            ax1.set_title("Total Execution Time by Nesting Depth")
-            ax1.grid(True, alpha=0.3, axis="y")
-
-            # Add value labels
-            for bar, time in zip(bars1, depth_times):
-                ax1.text(
-                    bar.get_x() + bar.get_width() / 2,
-                    bar.get_height() + max(depth_times) * 0.01,
-                    f"{time:.1f}ms",
-                    ha="center",
-                    va="bottom",
-                )
-
-            # Right plot: Function count by depth
-            bars2 = ax2.bar(
-                depths, depth_counts, alpha=0.8, color="lightcoral"
+            scatter = ax.scatter(
+                calls,
+                avg_durations,
+                s=sizes,
+                alpha=0.6,
+                c=total_times,
+                cmap="viridis",
+                edgecolors="white",
+                linewidth=0.5,
             )
-            ax2.set_xlabel("Nesting Depth")
-            ax2.set_ylabel("Number of Functions")
-            ax2.set_title("Function Count by Nesting Depth")
-            ax2.grid(True, alpha=0.3, axis="y")
 
-            # Add value labels
-            for bar, count in zip(bars2, depth_counts):
-                ax2.text(
-                    bar.get_x() + bar.get_width() / 2,
-                    bar.get_height() + max(depth_counts) * 0.01,
-                    f"{count}",
-                    ha="center",
-                    va="bottom",
+            ax.set_xlabel("Number of Calls", fontsize=12)
+            ax.set_ylabel("Average Duration per Call (ms)", fontsize=12)
+            ax.set_title(
+                "Function Call Patterns (Size = Total Time)",
+                fontsize=16,
+                fontweight="bold",
+                pad=20,
+            )
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+
+            # Add colorbar
+            cbar = plt.colorbar(scatter, ax=ax)
+            cbar.set_label(
+                "Total Execution Time (ms)",
+                rotation=270,
+                labelpad=20,
+                fontsize=11,
+            )
+
+            # Add annotations for outliers
+            for item in scatter_data[:5]:  # Top 5 by total time
+                ax.annotate(
+                    item["name"][:15],
+                    (item["calls"], item["avg_duration"]),
+                    xytext=(5, 5),
+                    textcoords="offset points",
+                    fontsize=9,
+                    alpha=0.8,
                 )
+
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            ax.grid(True, alpha=0.3, linestyle="--")
 
             plt.tight_layout()
             p = create_output_path(
-                output_path, prefix, "18_nesting_depth_analysis.png", out_dir
+                output_path, prefix, "06_performance_summary.png", out_dir
             )
-            plt.savefig(p, dpi=200, bbox_inches="tight")
+            plt.savefig(p, dpi=300, bbox_inches="tight")
             plots_created.append(p)
             if show_plot:
                 plt.show()
@@ -3152,6 +2645,7 @@ def analyse_swift_log_timings(
         default_functions = [
             "engine_rebuild",
             "space_rebuild",
+            "space_split",
             "engine_maketasks",
         ]
         functions_to_show = [
