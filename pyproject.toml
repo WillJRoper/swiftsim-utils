@@ -70,6 +70,8 @@ dependencies = [
   "PyYAML",       # Added: used in profile.py and modes/profile.py
   "matplotlib >= 3.5",   # Added: used in analyse mode for plotting
   "tqdm >= 4.60",         # Added: used for progress bars in src_parser and analyse
+  "tree-sitter",           # For C code parsing
+  "tree-sitter-c",         # C language support for tree-sitter
 ]
 
 # Optional dependencies for specific use cases
@@ -78,23 +80,6 @@ dependencies = [
 dev = [
     "ruff==0.11.7",
     "pre-commit",
-]
-
-# Visualization and analysis (used conditionally in analyse mode)
-plotting = [
-    "networkx",     # For call graph visualization
-    "squarify",     # For treemap visualizations
-]
-
-# Source code analysis (used conditionally in src_parser)
-source-analysis = [
-    "tree-sitter",           # For C code parsing
-    "tree-sitter-c",         # C language support for tree-sitter
-]
-
-# All optional dependencies
-all = [
-    "swiftsim-cli[plotting,source-analysis]",
 ]
 
 # Testing
