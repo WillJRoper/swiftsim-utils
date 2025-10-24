@@ -303,6 +303,9 @@ def edit_profile(key: str) -> None:
         default_softening_pivot_z=profile.softening_pivot_z
         if profile.softening_pivot_z
         else 2.7,
+        default_parameter_file=str(profile.parameter_file)
+        if profile.parameter_file
+        else None,
     )
     _save_swift_profile(updated_profile, key=key)
     print("\nProfile updated successfully.")
