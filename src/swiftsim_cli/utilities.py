@@ -70,8 +70,6 @@ def create_output_path(
     Raises:
         ValueError: If the output path is not a directory.
     """
-    from pathlib import Path
-
     # Create the output path
     if output_path is not None:
         path = Path(output_path)
