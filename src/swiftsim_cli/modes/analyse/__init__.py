@@ -1,9 +1,10 @@
 """Analyse mode for analysing SWIFT runs.
 
-This module provides comprehensive analysis capabilities for SWIFT simulation data:
+This module provides comprehensive analysis capabilities for SWIFT
+simulation data:
 
 - Timestep analysis: Analyse timestep evolution and plotting
-- Gravity checks: Force accuracy validation and error analysis  
+- Gravity checks: Force accuracy validation and error analysis
 - Error maps: Gravity error visualization and mapping
 - Log timing: Performance profiling and timing analysis with plots
 - Timer classification: Automatic function vs operation timer detection
@@ -30,10 +31,10 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
     # Import and set up each submodule's arguments
-    from .timesteps import add_timestep_arguments
     from .gravity_checks import add_gravity_checks_arguments
     from .gravity_error_maps import add_gravity_error_maps_arguments
     from .log_timing import add_log_arguments
+    from .timesteps import add_timestep_arguments
 
     add_timestep_arguments(subparsers)
     add_gravity_checks_arguments(subparsers)
@@ -56,13 +57,13 @@ def run(args: argparse.Namespace) -> None:
 
 
 # Import functions for backward compatibility and external access
+from .log_timing import analyse_swift_log_timings
 from .timer_classification import classify_timers_by_max_time
 from .timesteps import analyse_timestep_files
-from .log_timing import analyse_swift_log_timings
 
 __all__ = [
     'add_arguments', 'run', 'run_timestep', 'run_swift_log_timing',
     'run_gravity_checks', 'run_gravity_error_maps',
-    'analyse_timestep_files', 'analyse_swift_log_timings', 
+    'analyse_timestep_files', 'analyse_swift_log_timings',
     'classify_timers_by_max_time'
 ]

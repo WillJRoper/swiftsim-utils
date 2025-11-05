@@ -206,5 +206,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# Ignore the version file 
+# Ignore the version files 
 src/swiftsim_utils/_version.py
+src/swiftsim_cli/_version.py
