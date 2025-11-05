@@ -363,6 +363,15 @@ def _generate_output_list_no_cosmo(args: dict) -> None:
             "factor."
         )
 
+    # Validate that we have the required inputs
+    if first_snap is None:
+        raise ValueError(
+            "You must specify the first snapshot time, redshift, or "
+            "scale factor."
+        )
+    if delta is None:
+        raise ValueError("You must specify a delta for snapshots.")
+
     # Is our delta logarithmic? This will require special handling.
     doing_log_scale_factor = delta_log_scale_factor is not None
     doing_snip_log_scale_factor = snip_delta_log_scale_factor is not None
@@ -446,6 +455,9 @@ def _generate_output_list_no_cosmo(args: dict) -> None:
 
     # If we are getting them, get the snipshot times
     if has_snipshots:
+        assert snip_delta is not None, (
+            "snip_delta must be provided when has_snipshots is True"
+        )
         if doing_z:
             snipshot_times = _get_out_list_z(
                 first_snap, snip_delta, final_snap
@@ -674,6 +686,12 @@ def unify_snapshot_times(
             "snapshot in terms of redshift, time, or scale factor."
         )
 
+    # Ensure values are not None before returning
+    if first_snap is None:
+        raise ValueError("Failed to determine first snapshot value")
+    if final_snap is None:
+        raise ValueError("Failed to determine final snapshot value")
+
     return first_snap, final_snap
 
 
@@ -834,14 +852,28 @@ def _generate_output_list_with_cosmo(args: dict, cosmo) -> None:
 
     # Get the output list of times for the snapshots
     if doing_z:
+        assert delta_z is not None, (
+            "delta_z must be provided when doing_z is True"
+        )
         snapshot_times = _get_out_list_z(first_snap, delta_z, final_snap)
     elif doing_time:
+        assert delta_time is not None, (
+            "delta_time must be provided when doing_time is True"
+        )
         snapshot_times = _get_out_list_time(first_snap, delta_time, final_snap)
     elif doing_scale_factor:
+        assert delta_scale_factor is not None, (
+            "delta_scale_factor must be provided when "
+            "doing_scale_factor is True"
+        )
         snapshot_times = _get_out_list_scale_factor(
             first_snap, delta_scale_factor, final_snap
         )
     elif doing_log_scale_factor:
+        assert delta_log_scale_factor is not None, (
+            "delta_log_scale_factor must be provided when "
+            "doing_log_scale_factor is True"
+        )
         snapshot_times = _get_out_list_log_scale_factor(
             first_snap, delta_log_scale_factor, final_snap
         )
@@ -855,18 +887,32 @@ def _generate_output_list_with_cosmo(args: dict, cosmo) -> None:
     # If we are getting them, get the snipshot times
     if has_snipshots:
         if snip_doing_z:
+            assert snip_delta_z is not None, (
+                "snip_delta_z must be provided when snip_doing_z is True"
+            )
             snipshot_times = _get_out_list_z(
                 snip_first_snap, snip_delta_z, snip_final_snap
             )
         elif snip_doing_time:
+            assert snip_delta_time is not None, (
+                "snip_delta_time must be provided when snip_doing_time is True"
+            )
             snipshot_times = _get_out_list_time(
                 snip_first_snap, snip_delta_time, snip_final_snap
             )
         elif snip_doing_scale_factor:
+            assert snip_delta_scale_factor is not None, (
+                "snip_delta_scale_factor must be provided when "
+                "snip_doing_scale_factor is True"
+            )
             snipshot_times = _get_out_list_scale_factor(
                 snip_first_snap, snip_delta_scale_factor, snip_final_snap
             )
         elif snip_doing_log_scale_factor:
+            assert snip_delta_log_scale_factor is not None, (
+                "snip_delta_log_scale_factor must be provided when "
+                "snip_doing_log_scale_factor is True"
+            )
             snipshot_times = _get_out_list_log_scale_factor(
                 snip_first_snap, snip_delta_log_scale_factor, snip_final_snap
             )

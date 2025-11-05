@@ -1,6 +1,6 @@
 """Unit tests for timer classification in the analyse module."""
 
-from swiftsim_cli.modes.analyse import classify_timers_by_max
+from swiftsim_cli.modes.analyse import classify_timers_by_max_time
 from swiftsim_cli.src_parser import TimerDef, TimerInstance
 
 
@@ -33,7 +33,7 @@ class TestTimerClassification:
         # Nesting DB without nested operations for this function
         nesting_db = {}
 
-        function_timer_ids, synthetic_timers = classify_timers_by_max(
+        function_timer_ids, synthetic_timers = classify_timers_by_max_time(
             instances_by_step, single_timer_db, nesting_db
         )
 
@@ -72,7 +72,7 @@ class TestTimerClassification:
             "space_split.c:105": sample_timer_db["space_split.c:105"],
         }
 
-        function_timer_ids, synthetic_timers = classify_timers_by_max(
+        function_timer_ids, synthetic_timers = classify_timers_by_max_time(
             instances_by_step, space_split_timer_db, sample_nesting_db
         )
 
@@ -115,7 +115,7 @@ class TestTimerClassification:
         # No nesting database guidance
         nesting_db = {}
 
-        function_timer_ids, synthetic_timers = classify_timers_by_max(
+        function_timer_ids, synthetic_timers = classify_timers_by_max_time(
             instances_by_step, space_split_timer_db, nesting_db
         )
 
@@ -155,7 +155,7 @@ class TestTimerClassification:
         # No nesting database guidance
         nesting_db = {}
 
-        function_timer_ids, synthetic_timers = classify_timers_by_max(
+        function_timer_ids, synthetic_timers = classify_timers_by_max_time(
             instances_by_step, space_split_timer_db, nesting_db
         )
 
@@ -209,7 +209,7 @@ class TestTimerClassification:
             ]
         }
 
-        function_timer_ids, synthetic_timers = classify_timers_by_max(
+        function_timer_ids, synthetic_timers = classify_timers_by_max_time(
             instances_by_step, generic_timer_db, sample_nesting_db
         )
 
@@ -223,7 +223,7 @@ class TestTimerClassification:
         timer_db = {}
         nesting_db = {}
 
-        function_timer_ids, synthetic_timers = classify_timers_by_max(
+        function_timer_ids, synthetic_timers = classify_timers_by_max_time(
             instances_by_step, timer_db, nesting_db
         )
 
@@ -259,7 +259,7 @@ class TestTimerClassification:
             "space_split.c:100": sample_timer_db["space_split.c:100"]
         }
 
-        function_timer_ids, synthetic_timers = classify_timers_by_max(
+        function_timer_ids, synthetic_timers = classify_timers_by_max_time(
             instances_by_step, space_split_timer_db, nesting_db
         )
 

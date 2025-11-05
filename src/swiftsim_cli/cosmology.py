@@ -3,10 +3,13 @@
 from functools import lru_cache
 from typing import Union
 
-import astropy.cosmology.core
-import astropy.units as u
+import astropy.cosmology.core  # type: ignore[import-untyped]
+import astropy.units as u  # type: ignore[import-untyped]
 import numpy as np
-from astropy.cosmology import FlatLambdaCDM, z_at_value
+from astropy.cosmology import (  # type: ignore[import-untyped]
+    FlatLambdaCDM,
+    z_at_value,
+)
 
 from swiftsim_cli.params import load_parameters
 

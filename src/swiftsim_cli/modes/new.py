@@ -5,7 +5,7 @@ import warnings
 from pathlib import Path
 from typing import Tuple
 
-import h5py
+import h5py  # type: ignore[import-untyped]
 from ruamel.yaml import YAML
 
 from swiftsim_cli.profile import load_swift_profile
