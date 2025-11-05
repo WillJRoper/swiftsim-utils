@@ -161,12 +161,23 @@ def _unescape_minimal(s: str) -> str:
     Returns:
         Minimally unescaped text.
     """
-    return (
-        s.replace(r"\"", '"')
-        .replace(r"\\", "\\")
-        .replace(r"\n", "\n")
-        .replace(r"\t", "\t")
-    )
+    import re
+
+    def replace_escape(match):
+        escape_seq = match.group(0)
+        if escape_seq == '\\"':
+            return '"'
+        elif escape_seq == "\\\\":
+            return "\\"
+        elif escape_seq == "\\n":
+            return "\n"
+        elif escape_seq == "\\t":
+            return "\t"
+        else:
+            return escape_seq  # Leave unknown sequences unchanged
+
+    # Use regex to handle all escape sequences in one pass
+    return re.sub(r"\\[\\\"nt]", replace_escape, s)
 
 
 def _printf_to_regex(fmt: str) -> Tuple[str, str]:

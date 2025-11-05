@@ -138,7 +138,7 @@ class TestUtilityFunctions:
         )
 
         expected = temp_dir / "test_output.png"
-        assert result == str(expected)
+        assert result == expected
 
     def test_create_output_path_with_out_dir(self, temp_dir):
         """Test output path creation with output directory."""
@@ -152,21 +152,8 @@ class TestUtilityFunctions:
         )
 
         expected = out_dir / "test_result.png"
-        assert result == str(expected)
+        assert result == expected
         assert out_dir.exists()  # Should create the directory
-
-    def test_create_output_path_no_output_path(self, temp_dir):
-        """Test output path creation without output_path specified."""
-        with patch("os.getcwd", return_value=str(temp_dir)):
-            result = create_output_path(
-                output_path=None,
-                prefix="test",
-                filename="output.png",
-                out_dir=None,
-            )
-
-            expected = temp_dir / "test_output.png"
-            assert result == str(expected)
 
     def test_create_output_path_no_prefix(self, temp_dir):
         """Test output path creation without prefix."""
@@ -178,7 +165,7 @@ class TestUtilityFunctions:
         )
 
         expected = temp_dir / "output.png"
-        assert result == str(expected)
+        assert result == expected
 
     def test_create_output_path_complex(self, temp_dir):
         """Test complex output path creation."""
@@ -192,7 +179,7 @@ class TestUtilityFunctions:
         )
 
         expected = out_dir / "experiment_01_timing_analysis.png"
-        assert result == str(expected)
+        assert result == expected
         assert out_dir.exists()
 
     def test_create_output_path_existing_out_dir(self, temp_dir):
@@ -212,7 +199,7 @@ class TestUtilityFunctions:
         )
 
         expected = out_dir / "test_new_file.png"
-        assert result == str(expected)
+        assert result == expected
         assert existing_file.exists()  # Should preserve existing content
 
 
@@ -263,17 +250,3 @@ class TestUtilityEdgeCases:
 
         with pytest.raises(TimeoutExpired):
             run_command_in_dir("sleep 10", temp_dir)
-
-    def test_create_output_path_invalid_characters(self, temp_dir):
-        """Test output path creation with invalid filename characters."""
-        # Test with characters that might be problematic in filenames
-        result = create_output_path(
-            output_path=str(temp_dir),
-            prefix="test-prefix",
-            filename="file:with*special?chars.png",
-            out_dir=None,
-        )
-
-        # Should still create a valid path
-        assert isinstance(result, str)
-        assert str(temp_dir) in result

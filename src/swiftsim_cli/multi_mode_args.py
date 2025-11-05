@@ -183,3 +183,17 @@ class MultiModeCLIArgs:
         print("  swift-cli update config --enable-debug make -j 8")
         print()
         print("For mode-specific help: swift-cli <mode> --help")
+
+
+def parse_multimode_args(
+    argv: Sequence[str] | None = None,
+) -> MultiModeCLIArgs:
+    """Parse multi-mode command-line arguments.
+
+    Args:
+        argv: Command-line arguments to parse. If None, uses sys.argv.
+
+    Returns:
+        MultiModeCLIArgs instance with parsed arguments.
+    """
+    return MultiModeCLIArgs(argv)
