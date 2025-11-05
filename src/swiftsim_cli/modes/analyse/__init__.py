@@ -62,8 +62,13 @@ from .timer_classification import classify_timers_by_max_time
 from .timesteps import analyse_timestep_files
 
 __all__ = [
-    'add_arguments', 'run', 'run_timestep', 'run_swift_log_timing',
-    'run_gravity_checks', 'run_gravity_error_maps',
-    'analyse_timestep_files', 'analyse_swift_log_timings',
-    'classify_timers_by_max_time'
+    "add_arguments",
+    "run",
+    "run_timestep",
+    "run_swift_log_timing",
+    "run_gravity_checks",
+    "run_gravity_error_maps",
+    "analyse_timestep_files",
+    "analyse_swift_log_timings",
+    "classify_timers_by_max_time",
 ]
