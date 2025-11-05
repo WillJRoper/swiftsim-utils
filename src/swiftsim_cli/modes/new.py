@@ -75,7 +75,7 @@ def run(args: argparse.Namespace) -> None:
 def derive_params_from_ics(
     inicond_file: Path,
     params: dict,
-) -> None:
+) -> dict:
     """Derive parameters from the initial conditions file.
 
     Args:
@@ -283,7 +283,7 @@ def make_new_parameter_file(
     inicond_file: Path,
     swift_dir: Path | None = None,
     overide_params: dict | None = None,
-) -> None:
+) -> dict:
     """Create a new parameter file for the SWIFT run.
 
     Args:

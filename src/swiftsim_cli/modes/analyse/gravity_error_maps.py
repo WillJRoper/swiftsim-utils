@@ -349,7 +349,9 @@ def _create_continuous_error_map(
     # Save the figure
     safe_label = label.replace(" ", "_").replace("/", "_")
     png_file = create_output_path(
-        output_path, prefix, f"gravity_error_map_{safe_label}.png"
+        str(output_path) if output_path is not None else None,
+        prefix,
+        f"gravity_error_map_{safe_label}.png",
     )
 
     fig.savefig(png_file, dpi=200, bbox_inches="tight")
@@ -481,7 +483,9 @@ def _create_threshold_error_map(
     # Save the figure
     safe_label = label.replace(" ", "_").replace("/", "_")
     png_file = create_output_path(
-        output_path, prefix, f"gravity_binary_error_map_{safe_label}.png"
+        str(output_path) if output_path is not None else None,
+        prefix,
+        f"gravity_binary_error_map_{safe_label}.png",
     )
 
     fig.savefig(png_file, dpi=200, bbox_inches="tight")

@@ -27,8 +27,8 @@ class SWIFTCLIProfile:
         data_dir: Path to the directory containing additional data files.
     """
 
-    swiftsim_dir: Path
-    data_dir: Path
+    swiftsim_dir: Path | None
+    data_dir: Path | None
     branch: str = "master"
     softening_coeff: float = 0.04
     softening_pivot_z: float = 2.7
@@ -107,20 +107,20 @@ def get_cli_profiles(
     )
     default_data = default_data if default_data is None else str(default_data)
     default_branch = str(default_branch)
-    default_softening_coeff = str(default_softening_coeff)
-    default_softening_pivot_z = str(default_softening_pivot_z)
+    default_softening_coeff_str = str(default_softening_coeff)
+    default_softening_pivot_z_str = str(default_softening_pivot_z)
 
     # Path completer for directory paths
     path_completer = PathCompleter(expanduser=True, only_directories=True)
 
     # Separate sessions so completers/validators do not leak.
-    path_session = PromptSession(
+    path_session: PromptSession[str] = PromptSession(
         style=PTK_STYLE,
         key_bindings=KB,
         complete_while_typing=False,
         reserve_space_for_menu=8,
     )
-    text_session = PromptSession(
+    text_session: PromptSession[str] = PromptSession(
         style=PTK_STYLE,
         complete_while_typing=False,
     )
@@ -156,7 +156,7 @@ def get_cli_profiles(
                 "Softening (in units of mean separation): ",
             )
         ],
-        default=default_softening_coeff,
+        default=default_softening_coeff_str,
     ).strip()
 
     softening_pivot_z = text_session.prompt(
@@ -166,16 +166,16 @@ def get_cli_profiles(
                 "Maximal softening pivot redshift: ",
             )
         ],
-        default=default_softening_pivot_z,
+        default=default_softening_pivot_z_str,
     ).strip()
 
     # Convert to absolute paths
-    swift_repo = Path(swift_repo).expanduser().resolve()
-    data_dir = Path(data_dir).expanduser().resolve()
+    swift_repo_path = Path(swift_repo).expanduser().resolve()
+    data_dir_path = Path(data_dir).expanduser().resolve()
 
     return SWIFTCLIProfile(
-        swift_repo,
-        data_dir,
+        swift_repo_path,
+        data_dir_path,
         swift_branch,
         float(softening_coeff),
         float(softening_pivot_z),
@@ -191,14 +191,14 @@ def _load_swift_profile(key=None) -> SWIFTCLIProfile:
     """
     # Return a dummy if the profile file does not yet exist
     if not PROFILE_FILE.exists():
-        return SWIFTCLIProfile(None, None, 0.04, 2.7)
+        return SWIFTCLIProfile(None, None, "master", 0.04, 2.7)
 
     with open(PROFILE_FILE, "r") as f:
         profile_data = yaml.safe_load(f)
 
     # If we don't have a profile yet return an empty one
     if profile_data is None:
-        return SWIFTCLIProfile(None, None, 0.04, 2.7)
+        return SWIFTCLIProfile(None, None, "master", 0.04, 2.7)
 
     # If key is None return the current profile
     if key is None:

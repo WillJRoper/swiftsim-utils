@@ -3,7 +3,7 @@
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Sequence, Tuple
+from typing import List, Sequence, Tuple, cast
 
 from swiftsim_cli.modes import AVAILABLE_MODES, MODE_MODULES, Mode
 from swiftsim_cli.profile import load_swift_profile
@@ -26,7 +26,7 @@ class MultiModeCLIArgs:
             argv = sys.argv[1:]
 
         # Parse global arguments first
-        self.global_args, remaining_argv = self._parse_global_args(argv)
+        self.global_args, remaining_argv = self._parse_global_args(list(argv))
 
         # Split remaining arguments by mode keywords
         self.modes: List[Tuple[Mode, argparse.Namespace]] = []
@@ -91,13 +91,15 @@ class MultiModeCLIArgs:
 
         mode_sections = []
         current_mode = None
-        current_args = []
+        current_args: list[str] = []
 
         for arg in argv:
             if arg in AVAILABLE_MODES:
                 # Found a new mode
                 if current_mode is not None:
-                    mode_sections.append((current_mode, current_args))
+                    mode_sections.append(
+                        (cast(Mode, current_mode), current_args)
+                    )
                 current_mode = arg
                 current_args = []
             elif arg == "--help" or arg == "-h":
@@ -119,7 +121,7 @@ class MultiModeCLIArgs:
 
         # Add the last mode section
         if current_mode is not None:
-            mode_sections.append((current_mode, current_args))
+            mode_sections.append((cast(Mode, current_mode), current_args))
 
         if not mode_sections:
             self._print_help()

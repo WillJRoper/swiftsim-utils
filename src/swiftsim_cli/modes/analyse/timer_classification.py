@@ -42,7 +42,7 @@ def classify_timers_by_max_time(
     function_timer_ids = set()
 
     # Calculate total time per timer across all steps
-    timer_totals = defaultdict(float)
+    timer_totals: dict[int, float] = defaultdict(float)
     for inst_list in instances_by_step.values():
         for inst in inst_list:
             timer_totals[inst.timer_id] += inst.time_ms

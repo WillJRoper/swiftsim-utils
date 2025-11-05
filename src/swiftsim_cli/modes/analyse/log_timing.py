@@ -20,7 +20,7 @@ import argparse
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Dict, List
+from typing import Callable, Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -142,7 +142,7 @@ def classify_timers_by_max_time(
     function_timer_ids = set()
 
     # Calculate total time per timer
-    timer_totals = defaultdict(float)
+    timer_totals: dict[int, float] = defaultdict(float)
     for inst_list in instances_by_step.values():
         for inst in inst_list:
             timer_totals[inst.timer_id] += inst.time_ms
@@ -1728,7 +1728,7 @@ def analyse_swift_log_timings(
     plots_created: List[str] = []
 
     # Create all the plots
-    plot_functions = [
+    plot_functions: list[tuple[Callable, tuple]] = [
         (
             create_function_timing_chart,
             (

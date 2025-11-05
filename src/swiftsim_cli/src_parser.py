@@ -29,7 +29,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import tree_sitter
 import tree_sitter_c
@@ -662,7 +662,8 @@ def load_timer_db() -> Dict[str, TimerDef]:
     if not TIMER_FILE.exists():
         config = load_swift_profile()
         os.makedirs(os.path.dirname(TIMER_FILE) or ".", exist_ok=True)
-        parse_src_timers(config.swiftsim_dir)
+        if config.swiftsim_dir is not None:
+            parse_src_timers(str(config.swiftsim_dir))
 
     yaml_safe = YAML(typ="safe")
     with open(TIMER_FILE, "r", encoding="utf-8") as f:
@@ -861,7 +862,7 @@ class TimerNestingGenerator:
         Returns:
             Dictionary suitable for writing to timer_nesting.yaml
         """
-        nesting_data = {
+        nesting_data: dict[str, Any] = {
             "version": 1,
             "description": "Auto-generated timer nesting relationships "
             "for SWIFT",

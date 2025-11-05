@@ -13,8 +13,16 @@ import argparse
 from pathlib import Path
 from typing import List
 
+import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
+
+# Ensure matplotlib has the tab10 colormap
+try:
+    tab10 = cm.get_cmap("tab10")
+except (AttributeError, ValueError):
+    # Fallback if tab10 is not available
+    tab10 = cm.get_cmap("Set1")
 
 from swiftsim_cli.utilities import create_output_path
 
@@ -87,7 +95,7 @@ def run_timestep(args: argparse.Namespace) -> None:
 
 def analyse_timestep_files(
     files: List[Path],
-    labels: List[str] = None,
+    labels: List[str] | None = None,
     output_path: Path = Path("./timestep_analysis.png"),
     time_bins: int = 100,
     dt_bins: int = 100,
@@ -127,7 +135,7 @@ def analyse_timestep_files(
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     fig.suptitle("Timestep Analysis", fontsize=16, fontweight="bold")
 
-    colors = plt.cm.tab10(np.linspace(0, 1, len(files)))
+    colors = tab10(np.linspace(0, 1, len(files)))
 
     for i, (file, label, color) in enumerate(zip(files, labels, colors)):
         if not file.exists():
@@ -199,7 +207,10 @@ def analyse_timestep_files(
 
     # Save the plot
     output_file = create_output_path(
-        output_path.parent, prefix, "timestep_analysis.png", output_path.parent
+        str(output_path.parent),
+        prefix,
+        "timestep_analysis.png",
+        str(output_path.parent),
     )
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
     print(f"Timestep analysis plot saved to: {output_file}")

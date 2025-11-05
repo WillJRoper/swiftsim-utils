@@ -52,14 +52,9 @@ jobs:
         ruff check src/ tests/ --exclude="src/swiftsim_cli/_version.py"
         ruff format --check src/ tests/ --exclude="src/swiftsim_cli/_version.py"
 
-    - name: Type check with mypy (if available)
+    - name: Type check with mypy
       run: |
-        if command -v mypy &> /dev/null; then
-          mypy src/swiftsim_cli/ || echo "mypy not available or type checking failed"
-        else
-          echo "mypy not available, skipping type checking"
-        fi
-      continue-on-error: true
+        mypy src/swiftsim_cli/ --ignore-missing-imports --no-strict-optional
 
     - name: Test with pytest
       run: |
