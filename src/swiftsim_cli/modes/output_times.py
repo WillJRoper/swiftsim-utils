@@ -171,7 +171,7 @@ def _get_out_list_scale_factor(
     """Generate an output list in scale factor."""
     if delta < 0:
         delta = -delta
-    return np.arange(first_snap, final_snap + delta, delta)
+    return np.arange(first_snap, final_snap + 1e-9, delta)
 
 
 def _get_out_list_log_scale_factor(
@@ -181,7 +181,7 @@ def _get_out_list_log_scale_factor(
     if delta < 0:
         delta = -delta
     return 10 ** np.arange(
-        np.log10(first_snap), np.log10(final_snap) + delta, delta
+        np.log10(first_snap), np.log10(final_snap) + 1e-9, delta
     )
 
 
@@ -252,7 +252,9 @@ def write_output_list(
 
     # Create the output lines
     for time, select in zip(sorted_times, sorted_select_output):
-        output_lines.append(f"{time}, {select}")
+        # Round to remove floating point precision artifacts
+        time_rounded = round(time, 10)
+        output_lines.append(f"{time_rounded}, {select}")
 
     # Write the output to the file
     with open(out_file, "w") as f:
@@ -335,15 +337,30 @@ def _generate_output_list_no_cosmo(args: dict) -> None:
 
     # Collapse the variables into a simpler set now we know we have what
     # we need.
-    first_snap = first_snap_z or first_snap_time or first_snap_scale_factor
+    first_snap = (
+        first_snap_z
+        if first_snap_z is not None
+        else first_snap_time
+        if first_snap_time is not None
+        else first_snap_scale_factor
+    )
     delta = (
-        delta_z or delta_time or delta_scale_factor or delta_log_scale_factor
+        delta_z
+        if delta_z is not None
+        else delta_time
+        if delta_time is not None
+        else delta_scale_factor
+        if delta_scale_factor is not None
+        else delta_log_scale_factor
     )
     snip_delta = (
         snip_delta_z
-        or snip_delta_time
-        or snip_delta_scale_factor
-        or snip_delta_log_scale_factor
+        if snip_delta_z is not None
+        else snip_delta_time
+        if snip_delta_time is not None
+        else snip_delta_scale_factor
+        if snip_delta_scale_factor is not None
+        else snip_delta_log_scale_factor
     )
 
     # Make sure we use the right final snapshot time, this has defaults so we

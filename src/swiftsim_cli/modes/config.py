@@ -118,7 +118,7 @@ def run(args: argparse.Namespace) -> None:
 
         # Now run the configuration
         config_swiftsim(
-            opts=" ".join(opts),
+            opts=" ".join(unique_opts),
             swift_dir=args.swift_dir,
         )
 

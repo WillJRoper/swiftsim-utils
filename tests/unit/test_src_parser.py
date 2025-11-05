@@ -17,6 +17,7 @@ from swiftsim_cli.src_parser import (
     _scan_balanced_call,
     _unescape_minimal,
     compile_site_patterns,
+    load_timer_db,
     scan_log_instances_by_step,
 )
 
@@ -292,3 +293,79 @@ class TestTimerNestingGeneration:
         generator = TimerNestingGenerator("/fake/src", timer_data)
         assert generator.src_dir == Path("/fake/src")
         assert len(generator.timer_data) == 1
+
+
+class TestTimerDatabase:
+    """Test timer database loading functionality."""
+
+    def test_load_timer_db_with_existing_file(self, temp_dir, sample_timer_db):
+        """Test loading timer database when file exists."""
+        # Create a mock timer file
+        from unittest.mock import patch
+
+        import yaml
+
+        timer_file = temp_dir / "timers.yaml"
+
+        # Convert TimerDef objects to list of dicts for YAML
+        timers_list = []
+        for timer_id, timer_def in sample_timer_db.items():
+            timers_list.append(
+                {
+                    "timer_id": timer_id,
+                    "function": timer_def.function,
+                    "log_pattern": timer_def.log_pattern,
+                    "start_line": timer_def.start_line,
+                    "end_line": timer_def.end_line,
+                    "label_text": timer_def.label_text,
+                    "timer_type": timer_def.timer_type,
+                }
+            )
+
+        yaml_data = {"timers": timers_list}
+
+        with open(timer_file, "w") as f:
+            yaml.dump(yaml_data, f)
+
+        # Mock TIMER_FILE to point to our test file
+        with patch("swiftsim_cli.src_parser.TIMER_FILE", timer_file):
+            timer_db = load_timer_db()
+
+            # Should load timers from file
+            assert len(timer_db) == len(sample_timer_db)
+            for timer_id in sample_timer_db:
+                assert timer_id in timer_db
+                assert isinstance(timer_db[timer_id], TimerDef)
+
+    def test_load_timer_db_empty_file(self, temp_dir):
+        """Test loading timer database from empty file."""
+        from unittest.mock import patch
+
+        timer_file = temp_dir / "empty_timers.yaml"
+        timer_file.write_text("")
+
+        with patch("swiftsim_cli.src_parser.TIMER_FILE", timer_file):
+            timer_db = load_timer_db()
+
+            # Empty file should return empty dict
+            assert timer_db == {}
+
+    def test_load_timer_db_file_without_timers_key(self, temp_dir):
+        """Test loading timer database from file without 'timers' key."""
+        from unittest.mock import patch
+
+        import yaml
+
+        timer_file = temp_dir / "no_timers_key.yaml"
+
+        # YAML file with no 'timers' key
+        yaml_data = {"some_other_key": "value"}
+
+        with open(timer_file, "w") as f:
+            yaml.dump(yaml_data, f)
+
+        with patch("swiftsim_cli.src_parser.TIMER_FILE", timer_file):
+            timer_db = load_timer_db()
+
+            # Should return empty dict when 'timers' key is missing
+            assert timer_db == {}

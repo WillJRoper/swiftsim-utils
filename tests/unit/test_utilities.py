@@ -250,3 +250,43 @@ class TestUtilityEdgeCases:
 
         with pytest.raises(TimeoutExpired):
             run_command_in_dir("sleep 10", temp_dir)
+
+    def test_make_directory_file_exists(self, temp_dir):
+        """Test make_directory when path exists as a file."""
+        # Create a file
+        file_path = temp_dir / "existing_file.txt"
+        file_path.write_text("test content")
+
+        # Try to make a directory with the same path
+        with pytest.raises(
+            FileExistsError, match="exists and is not a directory"
+        ):
+            make_directory(file_path)
+
+    def test_create_output_path_none(self, temp_dir):
+        """Test create_output_path with None output_path."""
+        with patch("pathlib.Path.cwd", return_value=temp_dir):
+            result = create_output_path(
+                output_path=None,
+                prefix="test",
+                filename="output.png",
+                out_dir=None,
+            )
+
+            expected = temp_dir / "test_output.png"
+            assert result == expected
+
+    def test_create_output_path_file_exists(self, temp_dir):
+        """Test create_output_path when path exists as a file."""
+        # Create a file
+        file_path = temp_dir / "existing_file.txt"
+        file_path.write_text("test content")
+
+        # Try to create output path with a file path
+        with pytest.raises(ValueError, match="exists but is not a directory"):
+            create_output_path(
+                output_path=str(file_path),
+                prefix="test",
+                filename="output.png",
+                out_dir=None,
+            )

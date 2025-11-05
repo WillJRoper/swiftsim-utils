@@ -49,6 +49,7 @@ class MultiModeCLIArgs:
             Tuple of (global_args, remaining_argv)
         """
         parser = argparse.ArgumentParser(add_help=False)
+        parser.add_argument("-v", "--verbose", action="store_true")
 
         # Parse known global args and return the rest
         global_args, remaining = parser.parse_known_args(argv)
