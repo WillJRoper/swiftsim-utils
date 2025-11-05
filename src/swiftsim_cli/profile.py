@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.key_binding import KeyBindings
