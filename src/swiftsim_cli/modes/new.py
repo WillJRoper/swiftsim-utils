@@ -242,6 +242,8 @@ def apply_overrides(params: dict, overide_params: dict | None = None) -> None:
             parameter file. Keys should be in the format 'PARENTKEY:KEY=VALUE'.
     """
     # Loop over the override parameters
+    if overide_params is None:
+        return
     for key, value in overide_params.items():
         # Split parent and child keys, if we have that structure, otherwise
         # something has gone wrong

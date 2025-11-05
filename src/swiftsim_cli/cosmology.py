@@ -62,6 +62,8 @@ def convert_redshift_to_time(
         The time(s) in seconds corresponding to the given redshift(s).
     """
     cosmo = get_cosmology()
+    if cosmo is None:
+        raise ValueError("Cosmology not initialized")
     return cosmo.age(redshift).value
 
 
