@@ -48,7 +48,9 @@ class TestShowMode:
         show.run(args)
 
         mock_display.assert_called_once_with(
-            show_profile=False, show_cosmology=True
+            print_header=False,
+            show_profile=False,
+            show_cosmology=True,
         )
 
     @patch("swiftsim_cli.modes.show.display_profile")
