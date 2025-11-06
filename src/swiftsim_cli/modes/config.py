@@ -109,11 +109,16 @@ def run(args: argparse.Namespace) -> None:
 
         # Remove any duplicate options while preserving order
         seen = set()
-        args.options = [x for x in opts if not (x in seen or seen.add(x))]
+        unique_opts = []
+        for x in opts:
+            if x not in seen:
+                seen.add(x)
+                unique_opts.append(x)
+        args.options = unique_opts
 
         # Now run the configuration
         config_swiftsim(
-            opts=" ".join(opts),
+            opts=" ".join(unique_opts),
             swift_dir=args.swift_dir,
         )
 

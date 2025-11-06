@@ -4,7 +4,7 @@ import argparse
 from dataclasses import asdict
 from pathlib import Path
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from swiftsim_cli.profile import (
     PROFILE_FILE,

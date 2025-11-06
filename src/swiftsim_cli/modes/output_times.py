@@ -171,7 +171,7 @@ def _get_out_list_scale_factor(
     """Generate an output list in scale factor."""
     if delta < 0:
         delta = -delta
-    return np.arange(first_snap, final_snap + delta, delta)
+    return np.arange(first_snap, final_snap + 1e-9, delta)
 
 
 def _get_out_list_log_scale_factor(
@@ -181,7 +181,7 @@ def _get_out_list_log_scale_factor(
     if delta < 0:
         delta = -delta
     return 10 ** np.arange(
-        np.log10(first_snap), np.log10(final_snap) + delta, delta
+        np.log10(first_snap), np.log10(final_snap) + 1e-9, delta
     )
 
 
@@ -252,7 +252,9 @@ def write_output_list(
 
     # Create the output lines
     for time, select in zip(sorted_times, sorted_select_output):
-        output_lines.append(f"{time}, {select}")
+        # Round to remove floating point precision artifacts
+        time_rounded = round(time, 10)
+        output_lines.append(f"{time_rounded}, {select}")
 
     # Write the output to the file
     with open(out_file, "w") as f:
@@ -335,15 +337,30 @@ def _generate_output_list_no_cosmo(args: dict) -> None:
 
     # Collapse the variables into a simpler set now we know we have what
     # we need.
-    first_snap = first_snap_z or first_snap_time or first_snap_scale_factor
+    first_snap = (
+        first_snap_z
+        if first_snap_z is not None
+        else first_snap_time
+        if first_snap_time is not None
+        else first_snap_scale_factor
+    )
     delta = (
-        delta_z or delta_time or delta_scale_factor or delta_log_scale_factor
+        delta_z
+        if delta_z is not None
+        else delta_time
+        if delta_time is not None
+        else delta_scale_factor
+        if delta_scale_factor is not None
+        else delta_log_scale_factor
     )
     snip_delta = (
         snip_delta_z
-        or snip_delta_time
-        or snip_delta_scale_factor
-        or snip_delta_log_scale_factor
+        if snip_delta_z is not None
+        else snip_delta_time
+        if snip_delta_time is not None
+        else snip_delta_scale_factor
+        if snip_delta_scale_factor is not None
+        else snip_delta_log_scale_factor
     )
 
     # Make sure we use the right final snapshot time, this has defaults so we
@@ -362,6 +379,15 @@ def _generate_output_list_no_cosmo(args: dict) -> None:
             "You must specify the final snapshot time, redshift, or scale "
             "factor."
         )
+
+    # Validate that we have the required inputs
+    if first_snap is None:
+        raise ValueError(
+            "You must specify the first snapshot time, redshift, or "
+            "scale factor."
+        )
+    if delta is None:
+        raise ValueError("You must specify a delta for snapshots.")
 
     # Is our delta logarithmic? This will require special handling.
     doing_log_scale_factor = delta_log_scale_factor is not None
@@ -446,6 +472,9 @@ def _generate_output_list_no_cosmo(args: dict) -> None:
 
     # If we are getting them, get the snipshot times
     if has_snipshots:
+        assert snip_delta is not None, (
+            "snip_delta must be provided when has_snipshots is True"
+        )
         if doing_z:
             snipshot_times = _get_out_list_z(
                 first_snap, snip_delta, final_snap
@@ -526,10 +555,10 @@ def unify_snapshot_times(
         # Convert the first snapshot to redshift
         first_snap = first_snap_z
         if first_snap is None and first_snap_time is not None:
-            first_snap = convert_time_to_redshift(first_snap_time)
+            first_snap = float(convert_time_to_redshift(first_snap_time))
         elif first_snap is None and first_snap_scale_factor is not None:
-            first_snap = convert_scale_factor_to_redshift(
-                first_snap_scale_factor
+            first_snap = float(
+                convert_scale_factor_to_redshift(first_snap_scale_factor)
             )
         else:
             raise ValueError(
@@ -540,10 +569,10 @@ def unify_snapshot_times(
         # Convert the final snapshot to redshift
         final_snap = final_snap_z
         if final_snap is None and final_snap_time is not None:
-            final_snap = convert_time_to_redshift(final_snap_time)
+            final_snap = float(convert_time_to_redshift(final_snap_time))
         elif final_snap is None and final_snap_scale_factor is not None:
-            final_snap = convert_scale_factor_to_redshift(
-                final_snap_scale_factor
+            final_snap = float(
+                convert_scale_factor_to_redshift(final_snap_scale_factor)
             )
         else:
             raise ValueError(
@@ -554,10 +583,16 @@ def unify_snapshot_times(
         # Convert the first snapshot to time
         first_snap = first_snap_time
         if first_snap is None and first_snap_z is not None:
-            first_snap = convert_redshift_to_time(first_snap_z)
+            first_snap = float(convert_redshift_to_time(first_snap_z))
         elif first_snap is None and first_snap_scale_factor is not None:
-            first_snap = convert_redshift_to_time(
-                convert_scale_factor_to_redshift(first_snap_scale_factor)
+            first_snap = float(
+                convert_redshift_to_time(
+                    float(
+                        convert_scale_factor_to_redshift(
+                            first_snap_scale_factor
+                        )
+                    )
+                )
             )
         else:
             raise ValueError(
@@ -568,10 +603,16 @@ def unify_snapshot_times(
         # Convert the final snapshot to time
         final_snap = final_snap_time
         if final_snap is None and final_snap_z is not None:
-            final_snap = convert_redshift_to_time(final_snap_z)
+            final_snap = float(convert_redshift_to_time(final_snap_z))
         elif final_snap is None and final_snap_scale_factor is not None:
-            final_snap = convert_redshift_to_time(
-                convert_scale_factor_to_redshift(final_snap_scale_factor)
+            final_snap = float(
+                convert_redshift_to_time(
+                    float(
+                        convert_scale_factor_to_redshift(
+                            final_snap_scale_factor
+                        )
+                    )
+                )
             )
         else:
             raise ValueError(
@@ -582,10 +623,12 @@ def unify_snapshot_times(
         # Convert the first snapshot to scale factor
         first_snap = first_snap_scale_factor
         if first_snap is None and first_snap_z is not None:
-            first_snap = convert_redshift_to_scale_factor(first_snap_z)
+            first_snap = float(convert_redshift_to_scale_factor(first_snap_z))
         elif first_snap is None and first_snap_time is not None:
-            first_snap = convert_redshift_to_scale_factor(
-                convert_time_to_redshift(first_snap_time)
+            first_snap = float(
+                convert_redshift_to_scale_factor(
+                    float(convert_time_to_redshift(first_snap_time))
+                )
             )
         else:
             raise ValueError(
@@ -596,10 +639,12 @@ def unify_snapshot_times(
         # Convert the final snapshot to scale factor
         final_snap = final_snap_scale_factor
         if final_snap is None and final_snap_z is not None:
-            final_snap = convert_redshift_to_scale_factor(final_snap_z)
+            final_snap = float(convert_redshift_to_scale_factor(final_snap_z))
         elif final_snap is None and final_snap_time is not None:
-            final_snap = convert_redshift_to_scale_factor(
-                convert_time_to_redshift(final_snap_time)
+            final_snap = float(
+                convert_redshift_to_scale_factor(
+                    float(convert_time_to_redshift(final_snap_time))
+                )
             )
         else:
             raise ValueError(
@@ -608,15 +653,20 @@ def unify_snapshot_times(
             )
     elif doing_log_scale_factor:
         # Convert the first snapshot to log10 scale factor
-        first_snap = np.log10(first_snap_scale_factor)
-        if first_snap is None and first_snap_z is not None:
-            first_snap = np.log10(
-                convert_redshift_to_scale_factor(first_snap_z)
+        if first_snap_scale_factor is not None:
+            first_snap = float(np.log10(first_snap_scale_factor))
+        elif first_snap_z is not None:
+            first_snap = float(
+                np.log10(float(convert_redshift_to_scale_factor(first_snap_z)))
             )
-        elif first_snap is None and first_snap_time is not None:
-            first_snap = np.log10(
-                convert_redshift_to_scale_factor(
-                    convert_time_to_redshift(first_snap_time)
+        elif first_snap_time is not None:
+            first_snap = float(
+                np.log10(
+                    float(
+                        convert_redshift_to_scale_factor(
+                            float(convert_time_to_redshift(first_snap_time))
+                        )
+                    )
                 )
             )
         else:
@@ -626,15 +676,20 @@ def unify_snapshot_times(
             )
 
         # Convert the final snapshot to log10 scale factor
-        final_snap = np.log10(final_snap_scale_factor)
-        if final_snap is None and final_snap_z is not None:
-            final_snap = np.log10(
-                convert_redshift_to_scale_factor(final_snap_z)
+        if final_snap_scale_factor is not None:
+            final_snap = float(np.log10(final_snap_scale_factor))
+        elif final_snap_z is not None:
+            final_snap = float(
+                np.log10(float(convert_redshift_to_scale_factor(final_snap_z)))
             )
-        elif final_snap is None and final_snap_time is not None:
-            final_snap = np.log10(
-                convert_redshift_to_scale_factor(
-                    convert_time_to_redshift(final_snap_time)
+        elif final_snap_time is not None:
+            final_snap = float(
+                np.log10(
+                    float(
+                        convert_redshift_to_scale_factor(
+                            float(convert_time_to_redshift(final_snap_time))
+                        )
+                    )
                 )
             )
         else:
@@ -647,6 +702,12 @@ def unify_snapshot_times(
             "Found no valid snapshot type. You must specify the first "
             "snapshot in terms of redshift, time, or scale factor."
         )
+
+    # Ensure values are not None before returning
+    if first_snap is None:
+        raise ValueError("Failed to determine first snapshot value")
+    if final_snap is None:
+        raise ValueError("Failed to determine final snapshot value")
 
     return first_snap, final_snap
 
@@ -808,14 +869,28 @@ def _generate_output_list_with_cosmo(args: dict, cosmo) -> None:
 
     # Get the output list of times for the snapshots
     if doing_z:
+        assert delta_z is not None, (
+            "delta_z must be provided when doing_z is True"
+        )
         snapshot_times = _get_out_list_z(first_snap, delta_z, final_snap)
     elif doing_time:
+        assert delta_time is not None, (
+            "delta_time must be provided when doing_time is True"
+        )
         snapshot_times = _get_out_list_time(first_snap, delta_time, final_snap)
     elif doing_scale_factor:
+        assert delta_scale_factor is not None, (
+            "delta_scale_factor must be provided when "
+            "doing_scale_factor is True"
+        )
         snapshot_times = _get_out_list_scale_factor(
             first_snap, delta_scale_factor, final_snap
         )
     elif doing_log_scale_factor:
+        assert delta_log_scale_factor is not None, (
+            "delta_log_scale_factor must be provided when "
+            "doing_log_scale_factor is True"
+        )
         snapshot_times = _get_out_list_log_scale_factor(
             first_snap, delta_log_scale_factor, final_snap
         )
@@ -829,18 +904,32 @@ def _generate_output_list_with_cosmo(args: dict, cosmo) -> None:
     # If we are getting them, get the snipshot times
     if has_snipshots:
         if snip_doing_z:
+            assert snip_delta_z is not None, (
+                "snip_delta_z must be provided when snip_doing_z is True"
+            )
             snipshot_times = _get_out_list_z(
                 snip_first_snap, snip_delta_z, snip_final_snap
             )
         elif snip_doing_time:
+            assert snip_delta_time is not None, (
+                "snip_delta_time must be provided when snip_doing_time is True"
+            )
             snipshot_times = _get_out_list_time(
                 snip_first_snap, snip_delta_time, snip_final_snap
             )
         elif snip_doing_scale_factor:
+            assert snip_delta_scale_factor is not None, (
+                "snip_delta_scale_factor must be provided when "
+                "snip_doing_scale_factor is True"
+            )
             snipshot_times = _get_out_list_scale_factor(
                 snip_first_snap, snip_delta_scale_factor, snip_final_snap
             )
         elif snip_doing_log_scale_factor:
+            assert snip_delta_log_scale_factor is not None, (
+                "snip_delta_log_scale_factor must be provided when "
+                "snip_doing_log_scale_factor is True"
+            )
             snipshot_times = _get_out_list_log_scale_factor(
                 snip_first_snap, snip_delta_log_scale_factor, snip_final_snap
             )
@@ -866,26 +955,40 @@ def _generate_output_list_with_cosmo(args: dict, cosmo) -> None:
         elif doing_log_scale_factor and snip_doing_scale_factor:
             pass  # nothing to do (result is still in scale factor)
         elif doing_z and snip_doing_time:
-            snipshot_times = convert_time_to_redshift(snipshot_times)
+            snipshot_times = np.asarray(
+                convert_time_to_redshift(snipshot_times)
+            )
         elif doing_z and (
             snip_doing_scale_factor or snip_doing_log_scale_factor
         ):
-            snipshot_times = convert_scale_factor_to_redshift(snipshot_times)
+            snipshot_times = np.asarray(
+                convert_scale_factor_to_redshift(snipshot_times)
+            )
         elif doing_time and snip_doing_z:
-            snipshot_times = convert_redshift_to_time(snipshot_times)
+            snipshot_times = np.asarray(
+                convert_redshift_to_time(snipshot_times)
+            )
         elif doing_time and (
             snip_doing_scale_factor or snip_doing_log_scale_factor
         ):
-            snipshot_times = convert_redshift_to_time(
-                convert_scale_factor_to_redshift(snipshot_times)
+            snipshot_times = np.asarray(
+                convert_redshift_to_time(
+                    np.asarray(
+                        convert_scale_factor_to_redshift(snipshot_times)
+                    )
+                )
             )
         elif (doing_scale_factor or doing_log_scale_factor) and snip_doing_z:
-            snipshot_times = convert_redshift_to_scale_factor(snipshot_times)
+            snipshot_times = np.asarray(
+                convert_redshift_to_scale_factor(snipshot_times)
+            )
         elif (
             doing_scale_factor or doing_log_scale_factor
         ) and snip_doing_time:
-            snipshot_times = convert_redshift_to_scale_factor(
-                convert_time_to_redshift(snipshot_times)
+            snipshot_times = np.asarray(
+                convert_redshift_to_scale_factor(
+                    np.asarray(convert_time_to_redshift(snipshot_times))
+                )
             )
         else:
             raise ValueError(

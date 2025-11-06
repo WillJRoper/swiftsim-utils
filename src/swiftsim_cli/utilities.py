@@ -1,6 +1,5 @@
 """A module containing generic utility functions for SWIFTSim-CLI."""
 
-import os
 from pathlib import Path
 
 ascii_art = (
@@ -15,8 +14,7 @@ ascii_art = (
 def run_command_in_dir(command: str, directory: Path) -> None:
     """Run a command in a specified directory.
 
-    This function changes the current working directory to the specified
-    directory, runs the command, and then returns to the original directory.
+    This function runs the command in the specified directory using subprocess.
 
     Args:
         command: The command to run.
@@ -24,17 +22,12 @@ def run_command_in_dir(command: str, directory: Path) -> None:
 
     Raises:
         FileNotFoundError: If the specified directory does not exist.
+        CalledProcessError: If the command fails.
     """
-    # Cache the current working directory
-    original_cwd = os.getcwd()
+    import subprocess
 
-    # Try to change to the specified directory and run the command, make sure
-    # we always return to the original directory
-    try:
-        os.chdir(directory)
-        os.system(command)
-    finally:
-        os.chdir(original_cwd)
+    # Use subprocess.run with shell=True and cwd parameter
+    subprocess.run(command, shell=True, cwd=str(directory), check=True)
 
 
 def make_directory(path: Path) -> None:
@@ -52,8 +45,8 @@ def make_directory(path: Path) -> None:
 def create_output_path(
     output_path: str | None = None,
     prefix: str | None = None,
-    base_filename: str = "output.png",
-    output_dir: str | None = None,
+    filename: str = "output.png",
+    out_dir: str | None = None,
 ) -> Path:
     """Create and validate output path for saving files.
 
@@ -61,8 +54,8 @@ def create_output_path(
         output_path: Optional path to save the file. If None, uses
            current directory.
         prefix: Optional prefix to add to the filename.
-        base_filename: Base filename to use (default: "output.png").
-        output_dir: An optional directory to hold the outputs.
+        filename: Base filename to use (default: "output.png").
+        out_dir: An optional directory to hold the outputs.
 
     Returns:
         Path: Complete path to the output file.
@@ -70,8 +63,6 @@ def create_output_path(
     Raises:
         ValueError: If the output path is not a directory.
     """
-    from pathlib import Path
-
     # Create the output path
     if output_path is not None:
         path = Path(output_path)
@@ -86,13 +77,13 @@ def create_output_path(
     path.mkdir(parents=True, exist_ok=True)
 
     # Create the output filename with optional prefix
-    filename = f"{prefix + '_' if prefix else ''}{base_filename}"
-    if output_dir is not None:
+    output_filename = f"{prefix + '_' if prefix else ''}{filename}"
+    if out_dir is not None:
         # Create the output subdirectory if it doesn't exist
-        (path / output_dir).mkdir(parents=True, exist_ok=True)
-        output_file = path / output_dir / filename
+        (path / out_dir).mkdir(parents=True, exist_ok=True)
+        output_file = path / out_dir / output_filename
     else:
-        output_file = path / filename
+        output_file = path / output_filename
 
     return output_file
 

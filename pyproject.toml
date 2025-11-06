@@ -66,7 +66,12 @@ dependencies = [
   "scipy",
   "unyt",
   "prompt_toolkit",
-  "ruamel_yaml",
+  "ruamel.yaml",  # Fixed: should be ruamel.yaml not ruamel_yaml
+  "PyYAML",       # Added: used in profile.py and modes/profile.py
+  "matplotlib >= 3.5",   # Added: used in analyse mode for plotting
+  "tqdm >= 4.60",         # Added: used for progress bars in src_parser and analyse
+  "tree-sitter",           # For C code parsing
+  "tree-sitter-c",         # C language support for tree-sitter
 ]
 
 # Optional dependencies for specific use cases
@@ -79,9 +84,14 @@ dev = [
 
 # Testing
 test = [
-    "pytest",
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-mock>=3.10",
+    "coverage[toml]>=7.0",
     "ruff==0.11.7",
     "mypy>=0.910",
+    "bandit>=1.7",
+    "safety>=2.3",
 ]
 
 # Documentation building
@@ -204,3 +214,52 @@ skip-magic-trailing-comma = false
 
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
+
+# Pytest configuration
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+    "--cov=src/swiftsim_cli",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--cov-fail-under=50",
+]
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["src/swiftsim_cli"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/test_*",
+    "src/swiftsim_cli/_version.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+# Bandit security configuration
+[tool.bandit]
+exclude_dirs = ["tests", "build", "dist"]
+skips = ["B101", "B601"]  # Skip assert_used and shell=True tests

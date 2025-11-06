@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.key_binding import KeyBindings
@@ -51,8 +51,8 @@ class SWIFTCLIProfile:
         deg_nu: Comma-separated list of neutrino degeneracies.
     """
 
-    swiftsim_dir: Path
-    data_dir: Path
+    swiftsim_dir: Path | None
+    data_dir: Path | None
     branch: str = "master"
     softening_coeff: float = 0.04
     softening_pivot_z: float = 2.7
@@ -287,8 +287,8 @@ def get_cli_profiles(
     )
     default_data = default_data if default_data is None else str(default_data)
     default_branch = str(default_branch)
-    default_softening_coeff = str(default_softening_coeff)
-    default_softening_pivot_z = str(default_softening_pivot_z)
+    default_softening_coeff_str = str(default_softening_coeff)
+    default_softening_pivot_z_str = str(default_softening_pivot_z)
     default_parameter_file = (
         default_parameter_file
         if default_parameter_file is None
@@ -301,13 +301,13 @@ def get_cli_profiles(
     file_completer = PathCompleter(expanduser=True)
 
     # Separate sessions so completers/validators do not leak.
-    path_session = PromptSession(
+    path_session: PromptSession[str] = PromptSession(
         style=PTK_STYLE,
         key_bindings=KB,
         complete_while_typing=False,
         reserve_space_for_menu=8,
     )
-    text_session = PromptSession(
+    text_session: PromptSession[str] = PromptSession(
         style=PTK_STYLE,
         complete_while_typing=False,
     )
@@ -355,7 +355,7 @@ def get_cli_profiles(
                 "Softening (in units of mean separation): ",
             )
         ],
-        default=default_softening_coeff,
+        default=default_softening_coeff_str,
     ).strip()
 
     softening_pivot_z = text_session.prompt(
@@ -365,12 +365,12 @@ def get_cli_profiles(
                 "Maximal softening pivot redshift: ",
             )
         ],
-        default=default_softening_pivot_z,
+        default=default_softening_pivot_z_str,
     ).strip()
 
     # Convert to absolute paths
-    swift_repo = Path(swift_repo).expanduser().resolve()
-    data_dir = Path(data_dir).expanduser().resolve()
+    swift_repo_path = Path(swift_repo).expanduser().resolve()
+    data_dir_path = Path(data_dir).expanduser().resolve()
     param_path = Path(parameter_file).expanduser().resolve()
 
     # Load cosmology parameters from parameter file
@@ -383,8 +383,8 @@ def get_cli_profiles(
         cosmology_params = {}
 
     return SWIFTCLIProfile(
-        swiftsim_dir=swift_repo,
-        data_dir=data_dir,
+        swiftsim_dir=swift_repo_path,
+        data_dir=data_dir_path,
         branch=swift_branch,
         softening_coeff=float(softening_coeff),
         softening_pivot_z=float(softening_pivot_z),

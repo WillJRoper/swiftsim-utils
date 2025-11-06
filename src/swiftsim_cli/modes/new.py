@@ -5,7 +5,7 @@ import warnings
 from pathlib import Path
 from typing import Tuple
 
-import h5py
+import h5py  # type: ignore[import-untyped]
 from ruamel.yaml import YAML
 
 from swiftsim_cli.profile import load_swift_profile
@@ -75,7 +75,7 @@ def run(args: argparse.Namespace) -> None:
 def derive_params_from_ics(
     inicond_file: Path,
     params: dict,
-) -> None:
+) -> dict:
     """Derive parameters from the initial conditions file.
 
     Args:
@@ -242,6 +242,8 @@ def apply_overrides(params: dict, overide_params: dict | None = None) -> None:
             parameter file. Keys should be in the format 'PARENTKEY:KEY=VALUE'.
     """
     # Loop over the override parameters
+    if overide_params is None:
+        return
     for key, value in overide_params.items():
         # Split parent and child keys, if we have that structure, otherwise
         # something has gone wrong
@@ -283,7 +285,7 @@ def make_new_parameter_file(
     inicond_file: Path,
     swift_dir: Path | None = None,
     overide_params: dict | None = None,
-) -> None:
+) -> dict:
     """Create a new parameter file for the SWIFT run.
 
     Args:

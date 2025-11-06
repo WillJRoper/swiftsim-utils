@@ -2,7 +2,7 @@
 
 import argparse
 import sys
-from typing import List, Sequence, Tuple
+from typing import List, Sequence, Tuple, cast
 
 from swiftsim_cli.modes import AVAILABLE_MODES, MODE_MODULES, Mode
 
@@ -24,7 +24,7 @@ class MultiModeCLIArgs:
             argv = sys.argv[1:]
 
         # Parse global arguments first
-        self.global_args, remaining_argv = self._parse_global_args(argv)
+        self.global_args, remaining_argv = self._parse_global_args(list(argv))
 
         # Split remaining arguments by mode keywords
         self.modes: List[Tuple[Mode, argparse.Namespace]] = []
@@ -49,6 +49,7 @@ class MultiModeCLIArgs:
             Tuple of (global_args, remaining_argv)
         """
         parser = argparse.ArgumentParser(add_help=False)
+        parser.add_argument("-v", "--verbose", action="store_true")
 
         # Parse known global args and return the rest
         global_args, remaining = parser.parse_known_args(argv)
@@ -68,13 +69,15 @@ class MultiModeCLIArgs:
 
         mode_sections = []
         current_mode = None
-        current_args = []
+        current_args: list[str] = []
 
         for arg in argv:
             if arg in AVAILABLE_MODES:
                 # Found a new mode
                 if current_mode is not None:
-                    mode_sections.append((current_mode, current_args))
+                    mode_sections.append(
+                        (cast(Mode, current_mode), current_args)
+                    )
                 current_mode = arg
                 current_args = []
             elif arg == "--help" or arg == "-h":
@@ -96,7 +99,7 @@ class MultiModeCLIArgs:
 
         # Add the last mode section
         if current_mode is not None:
-            mode_sections.append((current_mode, current_args))
+            mode_sections.append((cast(Mode, current_mode), current_args))
 
         if not mode_sections:
             self._print_help()
@@ -181,3 +184,17 @@ class MultiModeCLIArgs:
         print("  swift-cli update config --enable-debug make -j 8")
         print()
         print("For mode-specific help: swift-cli <mode> --help")
+
+
+def parse_multimode_args(
+    argv: Sequence[str] | None = None,
+) -> MultiModeCLIArgs:
+    """Parse multi-mode command-line arguments.
+
+    Args:
+        argv: Command-line arguments to parse. If None, uses sys.argv.
+
+    Returns:
+        MultiModeCLIArgs instance with parsed arguments.
+    """
+    return MultiModeCLIArgs(argv)
