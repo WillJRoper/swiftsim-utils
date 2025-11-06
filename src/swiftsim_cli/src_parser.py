@@ -702,18 +702,31 @@ def compile_site_patterns(
 ) -> List[Tuple[str, re.Pattern]]:
     """Compile per-site log-line regex patterns.
 
+    This function implements fail-fast behavior for corrupted timer patterns.
+    Invalid regex patterns indicate data corruption that would cause incorrect
+    timing analysis, so errors are raised rather than silently skipped.
+
     Args:
         timer_db: Mapping from timer_id to TimerDef.
 
     Returns:
         List of (timer_id, compiled_regex).
+
+    Raises:
+        ValueError: If any timer pattern fails to compile. This indicates
+            corrupted timer database requiring regeneration from source.
     """
     out: List[Tuple[str, re.Pattern]] = []
     for tid, td in timer_db.items():
         try:
             out.append((tid, re.compile(td.log_pattern)))
         except re.error as e:
-            print(f"Warning: bad regex for {tid}: {e}")
+            raise ValueError(
+                f"Invalid regex pattern for timer '{tid}': {e}\n"
+                f"Pattern: {td.log_pattern}\n"
+                f"This indicates corrupted timer database. "
+                f"Try regenerating with fresh source parsing."
+            ) from e
     return out
 
 

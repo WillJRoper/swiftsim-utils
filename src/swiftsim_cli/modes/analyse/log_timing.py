@@ -20,7 +20,7 @@ import argparse
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Callable, Dict, List
+from typing import Any, Callable, Dict, List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -172,8 +172,15 @@ def classify_timers_by_max_time(
     return function_timer_ids
 
 
-def load_timer_nesting(auto_generate=True, force_regenerate=False):
+def load_timer_nesting(
+    auto_generate: bool = True, force_regenerate: bool = False
+) -> Dict[str, Dict[str, Any]]:
     """Load timer nesting relationships.
+
+    This function loads or generates the timer nesting database required for
+    hierarchical timing analysis. It implements a fail-fast approach: if the
+    database cannot be generated due to missing configuration, it raises an
+    error rather than silently degrading functionality.
 
     Args:
         auto_generate: If True, automatically generate nesting DB if it
@@ -181,7 +188,20 @@ def load_timer_nesting(auto_generate=True, force_regenerate=False):
         force_regenerate: If True, regenerate even if file exists
 
     Returns:
-        Dictionary containing nesting relationships for functions
+        Dictionary mapping function names to their nesting information:
+        {
+            "function_name": {
+                "function_timer": "pattern",
+                "file": "source.c",
+                "nested_operations": ["op1", "op2"],
+                "nested_functions": ["func1", "func2"]
+            }
+        }
+
+    Raises:
+        ValueError: If swiftsim_dir is not set in profile and generation
+            is required. This is intentionally not caught to ensure users
+            are aware of configuration issues.
     """
     nesting_file = Path.home() / ".swiftsim-utils" / "timer_nesting.yaml"
 
@@ -191,33 +211,37 @@ def load_timer_nesting(auto_generate=True, force_regenerate=False):
     )
 
     if should_generate:
-        try:
-            print("Auto-generating timer nesting database from source code...")
+        print("Auto-generating timer nesting database from source code...")
 
-            # Try to get SWIFT source directory from profile
-            profile = load_swift_profile()
-            swift_src = profile.get("swift_src")
+        # Get SWIFT source directory from profile
+        profile = load_swift_profile()
+        swift_src = profile.swiftsim_dir
 
-            # Generate the nesting database
-            nesting_data = generate_timer_nesting_database(swift_src)
-
-            # Save to file
-            yaml_writer = YAML()
-            yaml_writer.default_flow_style = False
-            nesting_file.parent.mkdir(exist_ok=True)
-            with open(nesting_file, "w") as f:
-                yaml_writer.dump(nesting_data, f)
-
-            print(
-                "Generated nesting database with "
-                f"{len(nesting_data.get('nesting', {}))} functions"
+        # Fail fast if configuration is missing. Hierarchical timer analysis
+        # is a core feature that requires source code - silently degrading
+        # would hide configuration issues from users.
+        if swift_src is None:
+            raise ValueError(
+                "Cannot generate timer nesting database: 'swiftsim_dir' "
+                "not set in profile. Run 'swift-cli profile --init' to "
+                "configure your SWIFT installation path."
             )
-            return nesting_data.get("nesting", {})
 
-        except Exception as e:
-            print(f"Warning: Failed to auto-generate nesting database: {e}")
-            # Fall back to empty if generation fails
-            return {}
+        # Generate the nesting database
+        nesting_data = generate_timer_nesting_database(str(swift_src))
+
+        # Save to file
+        yaml_writer = YAML()
+        yaml_writer.default_flow_style = False
+        nesting_file.parent.mkdir(exist_ok=True)
+        with open(nesting_file, "w") as f:
+            yaml_writer.dump(nesting_data, f)
+
+        print(
+            "Generated nesting database with "
+            f"{len(nesting_data.get('nesting', {}))} functions"
+        )
+        return nesting_data.get("nesting", {})
 
     # Load existing file
     if not nesting_file.exists():

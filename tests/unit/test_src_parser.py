@@ -182,7 +182,7 @@ class TestPatternCompilation:
             assert hasattr(pattern, "search")  # Should be compiled regex
 
     def test_compile_site_patterns_bad_regex(self):
-        """Test pattern compilation with bad regex."""
+        """Test pattern compilation with bad regex raises ValueError."""
         bad_timer_db = {
             "bad.c:1": TimerDef(
                 timer_id="bad.c:1",
@@ -195,11 +195,16 @@ class TestPatternCompilation:
             )
         }
 
-        # Should handle bad regex gracefully
-        with patch("builtins.print") as mock_print:
-            compiled = compile_site_patterns(bad_timer_db)
-            assert len(compiled) == 0  # Bad regex should be filtered out
-            mock_print.assert_called()  # Should print warning
+        # Should raise ValueError for corrupted timer database
+        with pytest.raises(ValueError) as exc_info:
+            compile_site_patterns(bad_timer_db)
+
+        # Verify error message contains helpful information
+        error_msg = str(exc_info.value)
+        assert "bad.c:1" in error_msg  # Should include timer ID
+        assert "[unclosed bracket" in error_msg  # Should include pattern
+        assert "corrupted timer database" in error_msg.lower()
+        assert "regenerating" in error_msg.lower()  # Should suggest fix
 
 
 class TestLogScanning:
