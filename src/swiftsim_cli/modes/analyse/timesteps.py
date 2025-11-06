@@ -143,10 +143,42 @@ def analyse_timestep_files(
 
         print(f"Processing {file.name}...")
 
-        # Read the timestep file
-        data = np.loadtxt(file)
-        times = data[:, 1]  # Simulation time
-        timesteps = data[:, 2]  # Timestep values
+        # Read the timestep file with robust error handling
+        times = []
+        timesteps = []
+        with open(file, "r") as f:
+            for line in f:
+                # Skip comment lines
+                if line.startswith("#"):
+                    continue
+
+                # Skip non-data lines (data lines start with whitespace)
+                if not line[0].isspace():
+                    continue
+
+                # Split the line into parts
+                parts = line.split()
+
+                # Try to parse as floats, silently skip unparseable lines
+                try:
+                    # Convert all parts to floats to validate
+                    float_parts = [float(part) for part in parts]
+
+                    # Extract time and timestep (columns 1 and 2)
+                    if len(float_parts) >= 3:
+                        times.append(float_parts[1])
+                        timesteps.append(float_parts[2])
+                except (ValueError, IndexError):
+                    # Silently skip lines that can't be parsed
+                    continue
+
+        # Convert to numpy arrays
+        times = np.array(times)
+        timesteps = np.array(timesteps)
+
+        # Skip if no valid data found
+        if len(times) == 0:
+            continue
 
         # Plot 1: Timestep evolution over time
         axes[0, 0].plot(times, timesteps, label=label, color=color, alpha=0.8)
