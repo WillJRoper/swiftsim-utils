@@ -7,12 +7,13 @@ import pytest
 
 from swiftsim_cli.profile import (
     SWIFTCLIProfile,
-    _extract_cosmology_manually,
     _load_all_profiles,
     _save_swift_profile,
+    get_current_git_branch,
     get_default_parameter_file,
     load_cosmology_from_parameter_file,
     load_swift_profile,
+    sync_profile_with_repo,
     update_current_profile_value,
 )
 
@@ -91,87 +92,13 @@ Cosmology:
         assert result == {}
 
     def test_load_cosmology_with_malformed_yaml(self, tmp_path):
-        """Test fallback when YAML is malformed."""
+        """Test that malformed YAML raises an error."""
         param_file = tmp_path / "params.yml"
         param_file.write_text("invalid: yaml: content: [[[")
 
-        # Should return empty dict with warning
-        result = load_cosmology_from_parameter_file(param_file)
-        assert isinstance(result, dict)
-
-    def test_load_cosmology_with_yaml_and_manual_failure(self, tmp_path):
-        """Test when both YAML parsing and manual extraction fail."""
-        param_file = tmp_path / "params.yml"
-        # Create a file that will fail both YAML parsing and manual extraction
-        param_file.write_text("[[[invalid yaml")
-
-        with patch(
-            "swiftsim_cli.profile._extract_cosmology_manually"
-        ) as mock_extract:
-            mock_extract.side_effect = Exception("Manual extraction failed")
-
-            # Should return empty dict when both fail
-            result = load_cosmology_from_parameter_file(param_file)
-            assert result == {}
-
-
-class TestExtractCosmologyManually:
-    """Tests for _extract_cosmology_manually."""
-
-    def test_extract_cosmology_basic(self, tmp_path):
-        """Test manual extraction of cosmology parameters."""
-        param_file = tmp_path / "params.yml"
-        param_content = """
-Cosmology:
-  h: 0.7
-  Omega_m: 0.3
-  Omega_lambda: 0.7
-  Omega_b: 0.05
-"""
-        param_file.write_text(param_content)
-
-        result = _extract_cosmology_manually(param_file)
-
-        assert "h" in result
-        assert "Omega_m" in result
-        assert "Omega_lambda" in result
-        assert "Omega_b" in result
-
-    def test_extract_cosmology_with_defaults(self, tmp_path):
-        """Test that defaults are applied for missing parameters."""
-        param_file = tmp_path / "params.yml"
-        param_content = """
-Cosmology:
-  h: 0.7
-"""
-        param_file.write_text(param_content)
-
-        result = _extract_cosmology_manually(param_file)
-
-        # Should have h from file
-        assert "h" in result
-        # Should have defaults for missing params
-        assert "Omega_r" in result or len(result) > 0
-
-    def test_extract_cosmology_with_neutrinos(self, tmp_path):
-        """Test extraction with neutrino parameters."""
-        param_file = tmp_path / "params.yml"
-        param_content = """
-Cosmology:
-  h: 0.7
-  M_nu_eV: 0.06, 0.06, 0.06
-  deg_nu: 1.0, 1.0, 1.0
-  N_nu: 3
-"""
-        param_file.write_text(param_content)
-
-        result = _extract_cosmology_manually(param_file)
-
-        assert "h" in result
-        assert "M_nu_eV" in result
-        assert "deg_nu" in result
-        assert "N_nu" in result
-        assert result["N_nu"] == 3  # Should be int
+        # Should raise an error for malformed YAML
+        with pytest.raises(Exception):
+            load_cosmology_from_parameter_file(param_file)
 
 
 class TestGetDefaultParameterFile:
@@ -366,3 +293,144 @@ class TestUpdateCurrentProfileValue:
         call_args = mock_save.call_args
         updated_profile = call_args[0][0]
         assert updated_profile.h == 0.7
+
+
+class TestGetCurrentGitBranch:
+    """Tests for get_current_git_branch."""
+
+    @patch("subprocess.run")
+    def test_get_current_git_branch_success(self, mock_run, tmp_path):
+        """Test getting current git branch successfully."""
+        mock_result = Mock()
+        mock_result.stdout = "feature-branch\n"
+        mock_run.return_value = mock_result
+
+        swift_dir = tmp_path / "swift"
+        swift_dir.mkdir()
+
+        result = get_current_git_branch(swift_dir)
+
+        assert result == "feature-branch"
+        mock_run.assert_called_once_with(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=swift_dir,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+
+    @patch("subprocess.run")
+    def test_get_current_git_branch_failure(self, mock_run, tmp_path):
+        """Test handling git command failure."""
+        mock_run.side_effect = Exception("Git error")
+
+        swift_dir = tmp_path / "swift"
+        swift_dir.mkdir()
+
+        result = get_current_git_branch(swift_dir)
+
+        assert result is None
+
+    @patch("subprocess.run")
+    def test_get_current_git_branch_not_found(self, mock_run):
+        """Test handling when git is not found."""
+        mock_run.side_effect = FileNotFoundError()
+
+        result = get_current_git_branch(Path("/nonexistent"))
+
+        assert result is None
+
+    @patch("subprocess.run")
+    def test_get_current_git_branch_timeout(self, mock_run, tmp_path):
+        """Test handling git command timeout."""
+        import subprocess
+
+        mock_run.side_effect = subprocess.TimeoutExpired(
+            cmd=["git", "rev-parse", "--abbrev-ref", "HEAD"], timeout=10
+        )
+
+        swift_dir = tmp_path / "swift"
+        swift_dir.mkdir()
+
+        result = get_current_git_branch(swift_dir)
+
+        assert result is None
+
+
+class TestSyncProfileWithRepo:
+    """Tests for sync_profile_with_repo."""
+
+    @patch("swiftsim_cli.profile.update_current_profile_value")
+    @patch("swiftsim_cli.profile.get_current_git_branch")
+    @patch("swiftsim_cli.profile.load_swift_profile")
+    def test_sync_profile_with_repo_branch_changed(
+        self, mock_load, mock_get_branch, mock_update
+    ):
+        """Test syncing when git branch has changed."""
+        mock_profile = SWIFTCLIProfile(
+            swiftsim_dir=Path("/fake/swift"),
+            data_dir=Path("/fake/data"),
+            branch="master",
+        )
+        mock_load.return_value = mock_profile
+        mock_get_branch.return_value = "develop"
+
+        sync_profile_with_repo()
+
+        mock_update.assert_called_once_with("branch", "develop")
+
+    @patch("swiftsim_cli.profile.update_current_profile_value")
+    @patch("swiftsim_cli.profile.get_current_git_branch")
+    @patch("swiftsim_cli.profile.load_swift_profile")
+    def test_sync_profile_with_repo_no_change(
+        self, mock_load, mock_get_branch, mock_update
+    ):
+        """Test syncing when git branch hasn't changed."""
+        mock_profile = SWIFTCLIProfile(
+            swiftsim_dir=Path("/fake/swift"),
+            data_dir=Path("/fake/data"),
+            branch="master",
+        )
+        mock_load.return_value = mock_profile
+        mock_get_branch.return_value = "master"
+
+        sync_profile_with_repo()
+
+        mock_update.assert_not_called()
+
+    @patch("swiftsim_cli.profile.update_current_profile_value")
+    @patch("swiftsim_cli.profile.get_current_git_branch")
+    @patch("swiftsim_cli.profile.load_swift_profile")
+    def test_sync_profile_with_repo_no_swift_dir(
+        self, mock_load, mock_get_branch, mock_update
+    ):
+        """Test syncing when no swift directory is configured."""
+        mock_profile = SWIFTCLIProfile(
+            swiftsim_dir=None, data_dir=Path("/fake/data"), branch="master"
+        )
+        mock_load.return_value = mock_profile
+
+        sync_profile_with_repo()
+
+        mock_get_branch.assert_not_called()
+        mock_update.assert_not_called()
+
+    @patch("swiftsim_cli.profile.update_current_profile_value")
+    @patch("swiftsim_cli.profile.get_current_git_branch")
+    @patch("swiftsim_cli.profile.load_swift_profile")
+    def test_sync_profile_with_repo_git_error(
+        self, mock_load, mock_get_branch, mock_update
+    ):
+        """Test syncing when git command fails."""
+        mock_profile = SWIFTCLIProfile(
+            swiftsim_dir=Path("/fake/swift"),
+            data_dir=Path("/fake/data"),
+            branch="master",
+        )
+        mock_load.return_value = mock_profile
+        mock_get_branch.return_value = None
+
+        sync_profile_with_repo()
+
+        mock_update.assert_not_called()
