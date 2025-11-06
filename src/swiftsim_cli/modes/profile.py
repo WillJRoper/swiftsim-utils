@@ -243,12 +243,16 @@ def switch_profile(key: str) -> None:
 def display_profile(
     print_header: bool = True,
     title: str = "CURRENT PROFILE",
+    show_profile: bool = True,
+    show_cosmology: bool = True,
 ) -> None:
     """Display the current SWIFT-utils profile.
 
     Args:
         print_header: Whether to print the ASCII art header.
         title: Title to display above the profile table.
+        show_profile: Whether to display the profile information.
+        show_cosmology: Whether to display the cosmology information.
     """
     # Sync profile with actual repository state
     sync_profile_with_repo()
@@ -263,36 +267,42 @@ def display_profile(
     # Get the current profile
     profile = _load_swift_profile()
 
-    # Define cosmology parameters to exclude from main profile display
-    cosmology_params = {
-        "h",
-        "a_begin",
-        "a_end",
-        "Omega_m",
-        "Omega_lambda",
-        "Omega_b",
-        "Omega_r",
-        "w_0",
-        "w_a",
-        "T_nu_0",
-        "N_ur",
-        "N_nu",
-        "M_nu_eV",
-        "deg_nu",
-    }
+    # Display profile if requested
+    if show_profile:
+        # Define cosmology parameters to exclude from main profile display
+        cosmology_params = {
+            "h",
+            "a_begin",
+            "a_end",
+            "Omega_m",
+            "Omega_lambda",
+            "Omega_b",
+            "Omega_r",
+            "w_0",
+            "w_a",
+            "T_nu_0",
+            "N_ur",
+            "N_nu",
+            "M_nu_eV",
+            "deg_nu",
+        }
 
-    # Print the profile values (excluding cosmology) in a nice table format
-    headers = ["Key", "Value"]
-    rows = []
-    for field in asdict(profile).keys():
-        if field not in cosmology_params:
-            value = getattr(profile, field)
-            rows.append([field, str(value)])
+        # Print the profile values (excluding cosmology) in a nice table format
+        headers = ["Key", "Value"]
+        rows = []
+        for field in asdict(profile).keys():
+            if field not in cosmology_params:
+                value = getattr(profile, field)
+                rows.append([field, str(value)])
 
-    print(create_ascii_table(headers, rows, title=title))
+        print(create_ascii_table(headers, rows, title=title))
 
-    # Display cosmology from parameter file if available
-    if profile.parameter_file and profile.parameter_file.exists():
+    # Display cosmology from parameter file if requested and available
+    if (
+        show_cosmology
+        and profile.parameter_file
+        and profile.parameter_file.exists()
+    ):
         display_cosmology(profile.parameter_file)
 
 
