@@ -262,7 +262,6 @@ def display_profile(
         print()
         print("\n".join(ascii_art))
         print()
-        print(" Current SWIFT-utils profile:\n")
 
     # Get the current profile
     profile = _load_swift_profile()
