@@ -10,12 +10,11 @@ Key functions:
 """
 
 import argparse
-from pathlib import Path
-from typing import List
 
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.lines import Line2D
 
 # Ensure matplotlib has the tab10 colormap
 try:
@@ -37,7 +36,7 @@ def add_timestep_arguments(subparsers) -> None:
         "files",
         nargs="+",
         help="List of timestep files to analyse and produce a plot for.",
-        type=Path,
+        type=str,
     )
 
     timestep_parser.add_argument(
@@ -46,30 +45,22 @@ def add_timestep_arguments(subparsers) -> None:
         nargs="+",
         help="Labels for the files (same order as files).",
         type=str,
-        default=None,
+        required=True,
+    )
+
+    timestep_parser.add_argument(
+        "--plot-time",
+        help="Plot against time instead of scale factor.",
+        action="store_true",
+        default=True,
     )
 
     timestep_parser.add_argument(
         "--output-path",
         "-o",
         help="Output path for the plot.",
-        type=Path,
-        default=Path("./timestep_analysis.png"),
-    )
-
-    timestep_parser.add_argument(
-        "--time-bins",
-        "-t",
-        help="Number of time bins to use for the timestep histogram.",
-        type=int,
-        default=100,
-    )
-
-    timestep_parser.add_argument(
-        "--dt-bins",
-        help="Number of timestep bins to use for the timestep histogram.",
-        type=int,
-        default=100,
+        type=str,
+        default=None,
     )
 
     timestep_parser.add_argument(
@@ -77,7 +68,14 @@ def add_timestep_arguments(subparsers) -> None:
         "-p",
         help="Prefix for the output files.",
         type=str,
-        default="",
+        default=None,
+    )
+
+    timestep_parser.add_argument(
+        "--show-plot",
+        help="Show the plot after saving.",
+        action="store_true",
+        default=False,
     )
 
 
@@ -86,164 +84,184 @@ def run_timestep(args: argparse.Namespace) -> None:
     analyse_timestep_files(
         args.files,
         args.labels,
+        args.plot_time,
         args.output_path,
-        args.time_bins,
-        args.dt_bins,
         args.prefix,
+        args.show_plot,
     )
 
 
 def analyse_timestep_files(
-    files: List[Path],
-    labels: List[str] | None = None,
-    output_path: Path = Path("./timestep_analysis.png"),
-    time_bins: int = 100,
-    dt_bins: int = 100,
-    prefix: str = "",
+    files: list[str],
+    labels: list[str],
+    plot_time: bool = True,
+    output_path: str | None = None,
+    prefix: str | None = None,
+    show_plot: bool = True,
 ) -> None:
-    """Analyse a list of timestep files and create comparison plots.
-
-    Creates comprehensive timestep analysis plots including:
-    - Timestep evolution over time
-    - Timestep distribution histograms
-    - Cumulative timestep statistics
+    """Plot the timestep files of one or more SWIFT runs.
 
     Args:
-        files: List of timestep file paths to analyze
-        labels: Optional labels for each file (defaults to filenames)
-        output_path: Output directory for generated plots
-        time_bins: Number of bins for time-based histograms
-        dt_bins: Number of bins for timestep histograms
-        prefix: Prefix for output filenames
+        files: List of file paths to the timestep files.
+        labels: List of labels for the runs.
+        plot_time: Whether to plot against time or scale factor. If True, plot
+            against time, otherwise plot against scale factor.
+        output_path: Optional path to save the plot. If None, the plot is saved
+            to the current directory.
+        prefix: Optional prefix to add to the output filename. If None,
+            the default filename is determined by create_output_path.
+        show_plot: Whether to display the plot.
 
     Raises:
-        FileNotFoundError: If any of the input files don't exist
-        ValueError: If files and labels lists have different lengths
+        ValueError: If the number of files and labels do not match.
     """
-    if labels is None:
-        labels = [file.name for file in files]
-
+    # Make sure the number of files and labels match
     if len(files) != len(labels):
-        raise ValueError(
-            f"Number of files ({len(files)}) and labels ({len(labels)}) "
-            f"must match"
-        )
+        raise ValueError("Number of files and labels must match.")
 
-    print(f"Analyzing {len(files)} timestep files...")
+    # Are we plotting against time or scale factor?
+    time_index = 1 if plot_time else 2
+    wall_clock_index = 12
+    deadtime_index = -1
 
-    # Set up the plot
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-    fig.suptitle("Timestep Analysis", fontsize=16, fontweight="bold")
-
-    colors = tab10(np.linspace(0, 1, len(files)))
-
-    for i, (file, label, color) in enumerate(zip(files, labels, colors)):
-        if not file.exists():
-            raise FileNotFoundError(f"Timestep file not found: {file}")
-
-        print(f"Processing {file.name}...")
-
-        # Read the timestep file with robust error handling
-        times = []
-        timesteps = []
+    # Loop over the lines in the file and extract the relevant data
+    x = []
+    y = []
+    deadtime = []
+    for file in files:
+        xi, yi, dti = [], [], []
         with open(file, "r") as f:
             for line in f:
-                # Skip comment lines
+                # Ensure we aren't reading a comment line
                 if line.startswith("#"):
                     continue
 
-                # Skip non-data lines (data lines start with whitespace)
+                # If the line doesn't start with an empty space, its not a
+                # data line
                 if not line[0].isspace():
                     continue
 
                 # Split the line into parts
                 parts = line.split()
 
-                # Try to parse as floats, silently skip unparseable lines
-                try:
-                    # Convert all parts to floats to validate
-                    float_parts = [float(part) for part in parts]
-
-                    # Extract time and timestep (columns 1 and 2)
-                    if len(float_parts) >= 3:
-                        times.append(float_parts[1])
-                        timesteps.append(float_parts[2])
-                except (ValueError, IndexError):
-                    # Silently skip lines that can't be parsed
+                # Ensure we found 15 columns
+                if len(parts) != 15:
                     continue
 
-        # Convert to numpy arrays
-        times = np.array(times)
-        timesteps = np.array(timesteps)
+                # Ensure all 15 columns are numbers
+                try:
+                    [float(part) for part in parts]
+                except ValueError:
+                    print(
+                        "Failed to parse line:",
+                        line,
+                        "in file:",
+                        file,
+                        "(this is probably fine)",
+                    )
+                    continue
 
-        # Skip if no valid data found
-        if len(times) == 0:
-            continue
+                xi.append(float(parts[time_index]))
+                yi.append(float(parts[wall_clock_index]))
+                dti.append(float(parts[deadtime_index]))
 
-        # Plot 1: Timestep evolution over time
-        axes[0, 0].plot(times, timesteps, label=label, color=color, alpha=0.8)
+        # Convert to numpy arrays and compute cumulative sums in hours
+        x.append(np.array(xi))
+        y.append(np.cumsum(np.array(yi)) / (1000 * 60 * 60))
+        deadtime.append(np.cumsum(np.array(dti)) / (1000 * 60 * 60))
 
-        # Plot 2: Timestep distribution histogram
-        axes[0, 1].hist(
-            timesteps,
-            bins=dt_bins,
-            alpha=0.6,
-            label=label,
+    # Create the figure with two subplots
+    fig, (ax1, ax2) = plt.subplots(
+        2,
+        1,
+        figsize=(10, 8),
+        gridspec_kw={"height_ratios": [3, 1]},
+        sharex=True,
+    )
+    ax1.grid(True, alpha=0.3)
+    ax2.grid(True, alpha=0.3)
+
+    # Colors for the plots
+    colors = tab10(np.linspace(0, 1, len(files)))
+
+    # Main plot - absolute times
+    for i, (xi, yi, dt, label, color) in enumerate(  # type: ignore[assignment]
+        zip(x, y, deadtime, labels, colors)
+    ):
+        # Plot wall clock time (solid lines)
+        ax1.plot(
+            xi,
+            yi,
+            "-",
             color=color,
-            density=True,
+            linewidth=2,
         )
+        # Plot dead time (dashed lines with alpha) - make more visible
+        ax1.plot(xi, dt, "--", color=color, alpha=0.6, linewidth=2)
 
-        # Plot 3: Time distribution
-        axes[1, 0].hist(
-            times,
-            bins=time_bins,
+    # Set labels and title for main plot
+    x_label = "Time [Internal Units]" if plot_time else "Scale factor"
+    ax1.set_ylabel("Time [hrs]")
+
+    # Create custom legend with black lines showing line styles
+    legend_elements = [
+        Line2D(
+            [0],
+            [0],
+            color="black",
+            linestyle="-",
+            linewidth=2,
+            label="Wallclock Time",
+        ),
+        Line2D(
+            [0],
+            [0],
+            color="black",
+            linestyle="--",
+            linewidth=2,
             alpha=0.6,
-            label=label,
+            label="Dead Time",
+        ),
+    ]
+    ax1.legend(handles=legend_elements, loc="best")
+
+    # Deadtime percentage plot
+    for i, (xi, yi, dt, label, color) in enumerate(  # type: ignore[assignment]
+        zip(x, y, deadtime, labels, colors)
+    ):
+        # Calculate deadtime percentage: (deadtime / total_time) * 100
+        # Protect against division by zero
+        deadtime_percentage = np.where(yi != 0, (dt / yi) * 100, 0.0)
+
+        # Plot deadtime percentage
+        ax2.plot(
+            xi,
+            deadtime_percentage,
+            "-",
             color=color,
-            density=True,
+            label=f"{label}",
+            linewidth=2,
         )
 
-        # Plot 4: Cumulative timestep distribution
-        sorted_timesteps = np.sort(timesteps)
-        cumulative = np.arange(1, len(sorted_timesteps) + 1) / len(
-            sorted_timesteps
-        )
-        axes[1, 1].plot(sorted_timesteps, cumulative, label=label, color=color)
+    # Set labels and formatting for deadtime percentage plot
+    ax2.set_xlabel(x_label)
+    ax2.set_ylabel("Dead Time [%]")
+    ax2.legend(loc="best")
+    ax2.set_ylim(0, None)  # Start y-axis at 0 for percentage
 
-    # Format plots
-    axes[0, 0].set_xlabel("Simulation Time")
-    axes[0, 0].set_ylabel("Timestep")
-    axes[0, 0].set_title("Timestep Evolution")
-    axes[0, 0].legend()
-    axes[0, 0].grid(True, alpha=0.3)
-
-    axes[0, 1].set_xlabel("Timestep")
-    axes[0, 1].set_ylabel("Density")
-    axes[0, 1].set_title("Timestep Distribution")
-    axes[0, 1].legend()
-    axes[0, 1].grid(True, alpha=0.3)
-
-    axes[1, 0].set_xlabel("Simulation Time")
-    axes[1, 0].set_ylabel("Density")
-    axes[1, 0].set_title("Time Distribution")
-    axes[1, 0].legend()
-    axes[1, 0].grid(True, alpha=0.3)
-
-    axes[1, 1].set_xlabel("Timestep")
-    axes[1, 1].set_ylabel("Cumulative Fraction")
-    axes[1, 1].set_title("Cumulative Timestep Distribution")
-    axes[1, 1].legend()
-    axes[1, 1].grid(True, alpha=0.3)
-
+    # Adjust layout to prevent overlapping
     plt.tight_layout()
 
-    # Save the plot
+    # Create the output path
     output_file = create_output_path(
-        str(output_path.parent),
-        prefix,
-        "timestep_analysis.png",
-        str(output_path.parent),
+        output_path, prefix, "timestep_analysis.png"
     )
+
+    # Save the figure if an output path is provided
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
-    print(f"Timestep analysis plot saved to: {output_file}")
+    print(f"Plot saved to {output_file}")
+
+    # Show the plot if requested
+    if show_plot:
+        plt.show()
     plt.close()
