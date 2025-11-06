@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from . import analyse, config, make, new, output_times, profile, switch, update
+from . import analyse, config, make, new, output_times, profile, show, switch, update
 
 # Available modes for swift-utils CLI
 AVAILABLE_MODES = [
@@ -14,6 +14,7 @@ AVAILABLE_MODES = [
     "make",
     "new",
     "analyse",
+    "show",
 ]
 
 # Type hint for mode names
@@ -26,6 +27,7 @@ Mode = Literal[
     "make",
     "new",
     "analyse",
+    "show",
 ]
 
 # Mode module imports
@@ -40,4 +42,5 @@ MODE_MODULES = {
     "make": make,
     "new": new,
     "analyse": analyse,
+    "show": show,
 }
