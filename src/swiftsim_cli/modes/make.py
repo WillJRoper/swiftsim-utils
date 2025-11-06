@@ -23,10 +23,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 def run(args: argparse.Namespace) -> None:
     """Execute the make mode."""
-    make_swift(
-        swift_dir=args.swift_dir,
-        nr_threads=args.nr_threads,
-    )
+    make_swift(nr_threads=args.nr_threads)
 
 
 def make_swift(swift_dir: Path | None = None, nr_threads: int = 1) -> None:

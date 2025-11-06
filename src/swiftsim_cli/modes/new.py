@@ -67,7 +67,6 @@ def run(args: argparse.Namespace) -> None:
     make_new_run_dir(
         output_dir=args.path,
         inicond_file=args.inic,
-        swift_dir=args.swift_dir,
         overide_params=dict(args.param),
     )
 

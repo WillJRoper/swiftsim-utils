@@ -33,16 +33,13 @@ class TestMakeMode:
         """Test the run function calls make_swift with correct arguments."""
         # Create mock args
         args = Mock()
-        args.swift_dir = tmp_path / "swift"
         args.nr_threads = 8
 
         # Call run
         run(args)
 
         # Verify make_swift was called with correct arguments
-        mock_make_swift.assert_called_once_with(
-            swift_dir=args.swift_dir, nr_threads=8
-        )
+        mock_make_swift.assert_called_once_with(nr_threads=8)
 
 
 class TestMakeSwift:

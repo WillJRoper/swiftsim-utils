@@ -63,7 +63,7 @@ def run(args: argparse.Namespace) -> None:
     """
     # Are we just showing the config options?
     if args.show:
-        show_config_options(args.swift_dir)
+        show_config_options()
     else:
         # Build up the options to pass to the configure script
         opts = []
@@ -117,10 +117,7 @@ def run(args: argparse.Namespace) -> None:
         args.options = unique_opts
 
         # Now run the configuration
-        config_swiftsim(
-            opts=" ".join(unique_opts),
-            swift_dir=args.swift_dir,
-        )
+        config_swiftsim(opts=" ".join(unique_opts))
 
 
 def config_swiftsim(opts: str, swift_dir: Path | None = None) -> None:

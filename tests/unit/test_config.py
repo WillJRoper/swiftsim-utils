@@ -69,13 +69,12 @@ class TestConfigMode:
         # Create mock args
         args = Mock()
         args.show = True
-        args.swift_dir = tmp_path / "swift"
 
         # Call run
         run(args)
 
         # Verify show_config_options was called
-        mock_show.assert_called_once_with(args.swift_dir)
+        mock_show.assert_called_once_with()
 
     @patch("swiftsim_cli.modes.config.config_swiftsim")
     def test_run_with_debug(self, mock_config, tmp_path):
@@ -88,7 +87,6 @@ class TestConfigMode:
         args.eagle = False
         args.eaglexl = False
         args.options = []
-        args.swift_dir = tmp_path / "swift"
 
         # Call run
         run(args)
@@ -112,7 +110,6 @@ class TestConfigMode:
         args.eagle = False
         args.eaglexl = False
         args.options = []
-        args.swift_dir = tmp_path / "swift"
 
         # Call run
         run(args)
@@ -136,7 +133,6 @@ class TestConfigMode:
         args.eagle = True
         args.eaglexl = False
         args.options = []
-        args.swift_dir = tmp_path / "swift"
 
         # Call run
         run(args)
@@ -160,7 +156,6 @@ class TestConfigMode:
         args.eagle = False
         args.eaglexl = True
         args.options = []
-        args.swift_dir = tmp_path / "swift"
 
         # Call run
         run(args)
@@ -184,7 +179,6 @@ class TestConfigMode:
         args.eagle = False
         args.eaglexl = False
         args.options = []
-        args.swift_dir = tmp_path / "swift"
 
         # Call run
         run(args)
@@ -215,7 +209,6 @@ class TestConfigMode:
         )
         args.eaglexl = False
         args.options = []
-        args.swift_dir = tmp_path / "swift"
 
         # Call run
         run(args)
@@ -244,7 +237,6 @@ class TestConfigMode:
         args.eagle = False
         args.eaglexl = False
         args.options = ["--custom-opt1", "--custom-opt2"]
-        args.swift_dir = tmp_path / "swift"
 
         # Call run
         run(args)
