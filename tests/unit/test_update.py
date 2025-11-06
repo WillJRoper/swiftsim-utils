@@ -24,13 +24,12 @@ class TestUpdateMode:
         """Test the run function calls update_swift with correct arguments."""
         # Create mock args
         args = Mock()
-        args.swift_dir = tmp_path / "swift"
 
         # Call run
         run(args)
 
-        # Verify update_swift was called with the correct path
-        mock_update_swift.assert_called_once_with(args.swift_dir)
+        # Verify update_swift was called without arguments
+        mock_update_swift.assert_called_once_with()
 
 
 class TestUpdateSwift:

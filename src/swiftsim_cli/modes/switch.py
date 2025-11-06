@@ -22,10 +22,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 def run(args: argparse.Namespace) -> None:
     """Execute the switch mode."""
-    switch_swift_branch(
-        branch=args.branch,
-        swift_dir=args.swift_dir,
-    )
+    switch_swift_branch(branch=args.branch)
 
 
 def switch_swift_branch(branch: str, swift_dir: Path | None = None) -> None:
