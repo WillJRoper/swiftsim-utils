@@ -4,7 +4,7 @@ import argparse
 from dataclasses import asdict
 from pathlib import Path
 
-import yaml  # type: ignore[import-untyped]
+from ruamel.yaml import YAML
 
 from swiftsim_cli.profile import (
     PROFILE_FILE,
@@ -12,6 +12,8 @@ from swiftsim_cli.profile import (
     _load_swift_profile,
     _save_swift_profile,
     get_cli_profiles,
+    load_cosmology_from_parameter_file,
+    sync_profile_with_repo,
 )
 from swiftsim_cli.utilities import ascii_art, create_ascii_table
 
@@ -125,8 +127,10 @@ def initial_profile_profile() -> None:
 
     # If the profile file already exists, load it to use as defaults
     if PROFILE_FILE.exists():
+        yaml = YAML()
+        yaml.preserve_quotes = True
         with open(PROFILE_FILE, "r") as f:
-            profile_data = yaml.safe_load(f)
+            profile_data = yaml.load(f)
         if profile_data is None:  # Handle case where the file is empty
             profile_data = {}
         default_swift = profile_data.get("swiftsim_dir", None)
@@ -153,8 +157,11 @@ def initial_profile_profile() -> None:
     profile = {"Current": data, "Default": data}
 
     # Write the profile to the YAML file
+    yaml = YAML()
+    yaml.preserve_quotes = True
+    yaml.default_flow_style = False
     with open(PROFILE_FILE, "w") as f:
-        yaml.dump(profile, f, default_flow_style=False)
+        yaml.dump(profile, f)
 
     print("Profile saved to", PROFILE_FILE)
 
@@ -236,31 +243,88 @@ def switch_profile(key: str) -> None:
 def display_profile(
     print_header: bool = True,
     title: str = "CURRENT PROFILE",
+    show_profile: bool = True,
+    show_cosmology: bool = True,
 ) -> None:
     """Display the current SWIFT-utils profile.
 
     Args:
         print_header: Whether to print the ASCII art header.
         title: Title to display above the profile table.
+        show_profile: Whether to display the profile information.
+        show_cosmology: Whether to display the cosmology information.
     """
+    # Sync profile with actual repository state
+    sync_profile_with_repo()
+
     # Print a header
     if print_header:
         print()
         print("\n".join(ascii_art))
         print()
-        print(" Current SWIFT-utils profile:\n")
 
     # Get the current profile
     profile = _load_swift_profile()
 
-    # Print the profile values in a nice table format
-    headers = ["Key", "Value"]
-    rows = []
-    for field in asdict(profile).keys():
-        value = getattr(profile, field)
-        rows.append([field, str(value)])
+    # Display profile if requested
+    if show_profile:
+        # Define cosmology parameters to exclude from main profile display
+        cosmology_params = {
+            "h",
+            "a_begin",
+            "a_end",
+            "Omega_m",
+            "Omega_lambda",
+            "Omega_b",
+            "Omega_r",
+            "w_0",
+            "w_a",
+            "T_nu_0",
+            "N_ur",
+            "N_nu",
+            "M_nu_eV",
+            "deg_nu",
+        }
 
-    print(create_ascii_table(headers, rows, title=title))
+        # Print the profile values (excluding cosmology) in a nice table format
+        headers = ["Key", "Value"]
+        rows = []
+        for field in asdict(profile).keys():
+            if field not in cosmology_params:
+                value = getattr(profile, field)
+                rows.append([field, str(value)])
+
+        print(create_ascii_table(headers, rows, title=title))
+
+    # Display cosmology from parameter file if requested and available
+    if (
+        show_cosmology
+        and profile.parameter_file
+        and profile.parameter_file.exists()
+    ):
+        display_cosmology(profile.parameter_file)
+
+
+def display_cosmology(parameter_file: Path) -> None:
+    """Display cosmology parameters from a parameter file.
+
+    Args:
+        parameter_file: Path to the SWIFT parameter file.
+    """
+    cosmology = load_cosmology_from_parameter_file(parameter_file)
+
+    # Skip display if no cosmology data
+    if not cosmology:
+        return
+
+    # Create table rows for cosmology parameters
+    headers = ["Parameter", "Value"]
+    rows = []
+    for key, value in cosmology.items():
+        rows.append([key, str(value)])
+
+    print()  # Add spacing
+    print(create_ascii_table(headers, rows, title="PARAMETER FILE COSMOLOGY"))
 
 
 def list_profiles() -> None:

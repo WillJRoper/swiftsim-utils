@@ -320,3 +320,23 @@ class TestProfileFunctions:
         assert "test_profile" in captured.out
         # Current should be skipped
         assert "- Current" not in captured.out
+
+    @patch("swiftsim_cli.modes.profile._load_swift_profile")
+    @patch("swiftsim_cli.modes.profile.sync_profile_with_repo")
+    def test_display_profile_syncs_repo(self, mock_sync, mock_load):
+        """Test that display_profile syncs with repo before displaying."""
+        from pathlib import Path
+
+        from swiftsim_cli.modes.profile import display_profile
+        from swiftsim_cli.profile import SWIFTCLIProfile
+
+        mock_load.return_value = SWIFTCLIProfile(
+            swiftsim_dir=Path("/test/swift"),
+            data_dir=Path("/test/data"),
+            branch="master",
+        )
+
+        display_profile(print_header=False)
+
+        # Verify sync was called before loading profile
+        mock_sync.assert_called_once()
