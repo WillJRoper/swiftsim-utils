@@ -2,7 +2,17 @@
 
 from typing import Literal
 
-from . import analyse, config, make, new, output_times, profile, show, switch, update
+from . import (
+    analyse,
+    config,
+    make,
+    new,
+    output_times,
+    profile,
+    show,
+    switch,
+    update,
+)
 
 # Available modes for swift-utils CLI
 AVAILABLE_MODES = [
