@@ -195,11 +195,8 @@ def load_timer_nesting(auto_generate=True, force_regenerate=False):
             print("Auto-generating timer nesting database from source code...")
 
             # Try to get SWIFT source directory from profile
-            try:
-                profile = load_swift_profile()
-                swift_src = profile.get("swift_src")
-            except Exception:
-                swift_src = "/Users/willroper/Research/SWIFT/swiftsim/src"
+            profile = load_swift_profile()
+            swift_src = profile.get("swift_src")
 
             # Generate the nesting database
             nesting_data = generate_timer_nesting_database(swift_src)
