@@ -1,5 +1,6 @@
 """A module containing tools for permanently configuring SWIFT-utils."""
 
+import subprocess
 from dataclasses import (  # asdict may be used elsewhere
     asdict,
     dataclass,
@@ -8,12 +9,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-import yaml  # type: ignore[import-untyped]
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
 from prompt_toolkit.validation import ValidationError, Validator
+from ruamel.yaml import YAML
 
 # Define the path to the profile file
 PROFILE_FILE = Path.home() / ".swiftsim-utils" / "profiles.yaml"
@@ -94,28 +95,19 @@ def load_cosmology_from_parameter_file(parameter_file_path: Path) -> dict:
             f"Parameter file not found: {parameter_file_path}"
         )
 
-    try:
-        with open(parameter_file_path, "r") as f:
-            params = yaml.safe_load(f)
-    except yaml.YAMLError as e:
-        # If YAML parsing fails, try to extract just the cosmology section
-        # manually
-        print(
-            f"Warning: YAML parsing failed, attempting manual extraction: {e}"
-        )
-        try:
-            cosmology_params = _extract_cosmology_manually(parameter_file_path)
-            return cosmology_params
-        except Exception as manual_e:
-            print(f"Warning: Manual extraction also failed: {manual_e}")
-            print("Using default cosmology parameters")
-            return {}
+    # Read file and clean tabs
+    with open(parameter_file_path, "r", encoding="utf-8") as f:
+        raw_text = f.read()
+
+    # Replace tabs with spaces (same approach as params.py)
+    cleaned_text = raw_text.expandtabs(4)
+
+    yaml = YAML()
+    yaml.preserve_quotes = True
+    params = yaml.load(cleaned_text)
 
     if params is None or "Cosmology" not in params:
-        print(
-            f"Warning: No 'Cosmology' section found in {parameter_file_path}"
-        )
-        return {}  # Return empty dict for defaults
+        return {}  # Return empty dict if no cosmology section
 
     cosmo_params = params["Cosmology"]
 
@@ -137,68 +129,6 @@ def load_cosmology_from_parameter_file(parameter_file_path: Path) -> dict:
         "M_nu_eV": cosmo_params.get("M_nu_eV", "0.05, 0.01"),
         "deg_nu": cosmo_params.get("deg_nu", "1.0, 1.0"),
     }
-
-
-def _extract_cosmology_manually(parameter_file_path: Path) -> dict:
-    """Manually extract cosmology parameters from a SWIFT parameter file.
-
-    This is a fallback for files that have YAML formatting issues but
-    still contain valid cosmology parameters.
-
-    Args:
-        parameter_file_path: Path to the SWIFT parameter file.
-
-    Returns:
-        dict: Extracted cosmology parameters.
-    """
-    import re
-
-    cosmo_values = {}
-
-    with open(parameter_file_path, "r") as f:
-        content = f.read()
-
-    # Look for the Cosmology section
-    cosmo_section_match = re.search(
-        r"Cosmology:\s*\n(.*?)(?=^\S|\Z)", content, re.MULTILINE | re.DOTALL
-    )
-    if not cosmo_section_match:
-        raise ValueError("No Cosmology section found")
-
-    cosmo_section = cosmo_section_match.group(1)
-
-    # Extract key-value pairs from the cosmology section
-    patterns = {
-        "h": r"h:\s*([0-9.]+)",
-        "a_begin": r"a_begin:\s*([0-9.]+)",
-        "a_end": r"a_end:\s*([0-9.]+)",
-        "Omega_m": r"Omega_m:\s*([0-9.]+)",
-        "Omega_lambda": r"Omega_lambda:\s*([0-9.]+)",
-        "Omega_b": r"Omega_b:\s*([0-9.]+)",
-        "Omega_r": r"Omega_r:\s*([0-9.]+)",
-        "w_0": r"w_0:\s*([-0-9.]+)",
-        "w_a": r"w_a:\s*([-0-9.]+)",
-        "T_nu_0": r"T_nu_0:\s*([0-9.]+)",
-        "N_ur": r"N_ur:\s*([0-9.]+)",
-        "N_nu": r"N_nu:\s*([0-9]+)",
-        "M_nu_eV": r"M_nu_eV:\s*([0-9., ]+)",
-        "deg_nu": r"deg_nu:\s*([0-9., ]+)",
-    }
-
-    for key, pattern in patterns.items():
-        match = re.search(pattern, cosmo_section)
-        if match:
-            value = match.group(1).strip()
-            if key in ["M_nu_eV", "deg_nu"]:
-                cosmo_values[key] = (
-                    value  # Keep as string for comma-separated values
-                )
-            elif key == "N_nu":
-                cosmo_values[key] = int(value)
-            else:
-                cosmo_values[key] = float(value)
-
-    return cosmo_values
 
 
 def get_default_parameter_file(swiftsim_dir: Path) -> Path:
@@ -374,13 +304,8 @@ def get_cli_profiles(
     param_path = Path(parameter_file).expanduser().resolve()
 
     # Load cosmology parameters from parameter file
-    try:
-        cosmology_params = load_cosmology_from_parameter_file(param_path)
-        print(f"Loaded cosmology parameters from {param_path}")
-    except (FileNotFoundError, ValueError) as e:
-        print(f"Warning: Could not load cosmology parameters: {e}")
-        print("Using default cosmology parameters")
-        cosmology_params = {}
+    cosmology_params = load_cosmology_from_parameter_file(param_path)
+    print(f"Loaded cosmology parameters from {param_path}")
 
     return SWIFTCLIProfile(
         swiftsim_dir=swift_repo_path,
@@ -411,8 +336,10 @@ def _load_swift_profile(key=None) -> SWIFTCLIProfile:
             parameter_file=None,
         )
 
+    yaml = YAML()
+    yaml.preserve_quotes = True
     with open(PROFILE_FILE, "r") as f:
-        profile_data = yaml.safe_load(f)
+        profile_data = yaml.load(f)
 
     # If we don't have a profile yet return an empty one
     if profile_data is None:
@@ -473,8 +400,10 @@ def _load_all_profiles() -> dict[str, dict]:
     """
     # Load existing profile handling edge cases
     if PROFILE_FILE.exists():
+        yaml = YAML()
+        yaml.preserve_quotes = True
         with open(PROFILE_FILE, "r") as f:
-            all_profile_data = yaml.safe_load(f)
+            all_profile_data = yaml.load(f)
         if all_profile_data is None:  # Handle case where the file is empty
             all_profile_data = {}
     else:
@@ -518,8 +447,10 @@ def _save_swift_profile(
                 all_profile_data[k][_k] = str(_v)
 
     # Write back to the profile file
+    yaml = YAML()
+    yaml.preserve_quotes = True
     with open(PROFILE_FILE, "w") as f:
-        yaml.safe_dump(all_profile_data, f)
+        yaml.dump(all_profile_data, f)
 
     # Clear the cached profile
     _load_swift_profile.cache_clear()
@@ -540,3 +471,56 @@ def update_current_profile_value(key: str, value: str | float | int) -> None:
 
     # Save the updated profile
     _save_swift_profile(profile, "Current")
+
+
+def get_current_git_branch(swift_dir: Path) -> str | None:
+    """Get the current git branch from a SWIFT repository.
+
+    Args:
+        swift_dir: Path to the SWIFT repository.
+
+    Returns:
+        str | None: The current branch name, or None if unable to determine.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=swift_dir,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,  # Prevent hanging on slow/stuck operations
+        )
+        return result.stdout.strip()
+    except subprocess.TimeoutExpired:
+        # Git operation took too long
+        return None
+    except subprocess.CalledProcessError:
+        # Git command failed (not a repo, detached HEAD, etc.)
+        return None
+    except FileNotFoundError:
+        # Git executable not found
+        return None
+    except Exception:
+        # Unexpected error
+        return None
+
+
+def sync_profile_with_repo() -> None:
+    """Sync the current profile's branch with the actual git repository.
+
+    This updates the profile if the git branch has changed outside of
+    swift-cli.
+    """
+    profile = load_swift_profile()
+
+    # Only sync if we have a swift directory
+    if profile.swiftsim_dir is None:
+        return
+
+    # Get the actual current branch
+    actual_branch = get_current_git_branch(profile.swiftsim_dir)
+
+    # If we got a branch and it's different from profile, update
+    if actual_branch and actual_branch != profile.branch:
+        update_current_profile_value("branch", actual_branch)
