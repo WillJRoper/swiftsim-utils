@@ -27,15 +27,12 @@ class TestSwitchMode:
         # Create mock args
         args = Mock()
         args.branch = "feature-branch"
-        args.swift_dir = tmp_path / "swift"
 
         # Call run
         run(args)
 
         # Verify switch_swift_branch was called with correct arguments
-        mock_switch.assert_called_once_with(
-            branch="feature-branch", swift_dir=args.swift_dir
-        )
+        mock_switch.assert_called_once_with(branch="feature-branch")
 
 
 class TestSwitchSwiftBranch:

@@ -17,7 +17,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 def run(args: argparse.Namespace) -> None:
     """Execute the update mode."""
-    update_swift(args.swift_dir)
+    update_swift()
 
 
 def update_swift(swift_dir: Path | None = None) -> None:
