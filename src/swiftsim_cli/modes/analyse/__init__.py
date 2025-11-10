@@ -46,7 +46,7 @@ def run(args: argparse.Namespace) -> None:
     """Run the appropriate analysis based on the selected type."""
     if args.analysis_type == "timesteps":
         run_timestep(args)
-    elif args.analysis_type == "gravity-check":
+    elif args.analysis_type == "gravity-checks":
         run_gravity_checks(args)
     elif args.analysis_type == "gravity-error-maps":
         run_gravity_error_maps(args)

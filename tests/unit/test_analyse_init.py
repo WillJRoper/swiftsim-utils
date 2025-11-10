@@ -34,7 +34,7 @@ class TestAnalyseMode:
     def test_run_gravity_checks(self, mock_run_gravity_checks):
         """Test running gravity checks."""
         args = Mock()
-        args.analysis_type = "gravity-check"
+        args.analysis_type = "gravity-checks"
 
         run(args)
 
