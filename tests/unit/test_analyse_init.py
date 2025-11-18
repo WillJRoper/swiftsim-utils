@@ -60,6 +60,16 @@ class TestAnalyseMode:
 
         mock_run_swift_log_timing.assert_called_once_with(args)
 
+    @patch("swiftsim_cli.modes.analyse.run_swift_task_counts")
+    def test_run_task_counts(self, mock_run_swift_task_counts):
+        """Test running task counts analysis."""
+        args = Mock()
+        args.analysis_type = "task-counts"
+
+        run(args)
+
+        mock_run_swift_task_counts.assert_called_once_with(args)
+
     def test_run_unknown_type(self):
         """Test running with unknown analysis type."""
         args = Mock()
