@@ -34,7 +34,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import tree_sitter
 import tree_sitter_c
 from ruamel.yaml import YAML
-from tqdm.auto import tqdm
+from tqdm.auto import tqdm  # type: ignore[import-untyped]
 
 from swiftsim_cli.profile import load_swift_profile
 
@@ -50,6 +50,8 @@ __all__ = [
     "scan_log_instances_by_step",
     "TimerNestingGenerator",
     "generate_timer_nesting_database",
+    "TaskCountSnapshot",
+    "scan_task_counts_by_step",
 ]
 
 # =============================================================================
@@ -1094,3 +1096,216 @@ def generate_timer_nesting_database(
 
     generator = TimerNestingGenerator(src_dir, timer_data)
     return generator.generate_nesting_database()
+
+
+@dataclass
+class TaskCountSnapshot:
+    """One engine_print_task_counts block discovered in a log.
+
+    This represents the four-line summary printed once per step by
+    engine_print_task_counts() on (typically) rank 0.
+    """
+
+    step: Optional[int]
+    rank: int
+    sim_time: float
+    system_total: Optional[int]
+    num_cells: Optional[int]
+    total_tasks: Optional[int]
+    per_cell_avg: Optional[float]
+    per_cell_max: Optional[float]
+    counts: Dict[str, int]
+    line_index: int
+
+
+# engine_print_task_counts:
+_RE_ENGINE_TASK_COUNTS = re.compile(
+    r"^\[(?P<rank>\d+)\]\s+\[(?P<time>[0-9.]+)\]"
+    r"\s+engine_print_task_counts:\s*(?P<body>.*)$"
+)
+
+_RE_ENGINE_TASK_HEADER = re.compile(
+    r"^System total:\s*(?P<system_total>\d+)\s*,"
+    r"\s*no\. cells:\s*(?P<cells>\d+)\s*$"
+)
+
+_RE_ENGINE_TASK_TOTAL_PER_CELL = re.compile(
+    r"^Total\s*=\s*(?P<total>\d+)\s*\(per cell\s*="
+    r"\s*(?P<per_cell>[0-9.eE+\-]+)\s*\)\s*$"
+)
+
+_RE_ENGINE_TASK_TOTAL_MAX_PER_CELL = re.compile(
+    r"^Total\s*=\s*(?P<total>\d+)\s*\(maximum per"
+    r" cell\s*=\s*(?P<per_cell>[0-9.eE+\-]+)\s*\)\s*$"
+)
+
+_RE_ENGINE_TASK_COUNTS_BODY = re.compile(
+    r"^task counts are\s*\[(?P<body>.*)\]\s*$"
+)
+
+
+def scan_task_counts_by_step(
+    log_file: str,
+) -> Tuple[
+    Dict[Optional[int], List[TaskCountSnapshot]], List[Tuple[int, int]]
+]:
+    """Scan a SWIFT log for engine_print_task_counts summaries.
+
+    Args:
+        log_file: Path to the SWIFT log file.
+
+    Returns:
+        (snapshots_by_step, step_lines) where:
+
+          * snapshots_by_step[step] is a list of TaskCountSnapshot instances
+            in encounter order (step may be None),
+          * step_lines contains (line_index, step) pairs for every step
+            header line.
+    """
+    snapshots_by_step: Dict[Optional[int], List[TaskCountSnapshot]] = {}
+    step_lines: List[Tuple[int, int]] = []
+
+    print("  Counting log file lines for task count scan...")
+    with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+        total_lines = sum(1 for _ in f)
+
+    print(
+        f"  Processing {total_lines:,} lines to extract "
+        "engine_print_task_counts blocks..."
+    )
+
+    current_step: Optional[int] = None
+    current_block: Optional[Dict[str, Any]] = None
+
+    with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+        for idx, raw in tqdm(
+            enumerate(f),
+            total=total_lines,
+            desc="  Scanning task counts",
+            unit="line",
+        ):
+            line = raw.rstrip("\n")
+
+            # Track the current step (first integer token on line)
+            sm = _RE_STEP_LINE.match(line)
+            if sm:
+                current_step = int(sm.group("step"))
+                step_lines.append((idx, current_step))
+
+            # Look for engine_print_task_counts lines
+            m = _RE_ENGINE_TASK_COUNTS.match(line)
+            if not m:
+                continue
+
+            body = m.group("body").strip()
+            rank = int(m.group("rank"))
+            sim_time = float(m.group("time"))
+
+            # Header line: "System total: ..., no. cells: ..."
+            header_m = _RE_ENGINE_TASK_HEADER.match(body)
+            if header_m:
+                # Drop unfinished block; we only commit once we see
+                # "task counts are [...]".
+                current_block = {
+                    "step": current_step,
+                    "rank": rank,
+                    "sim_time": sim_time,
+                    "system_total": int(header_m.group("system_total")),
+                    "num_cells": int(header_m.group("cells")),
+                    "total_tasks": None,
+                    "per_cell_avg": None,
+                    "per_cell_max": None,
+                    "counts": {},
+                    "line_index": idx,
+                }
+                continue
+
+            # If we see a non-header engine_print_task_counts line
+            # without an existing block, start a minimal one so we can
+            # still attach counts.
+            if current_block is None:
+                current_block = {
+                    "step": current_step,
+                    "rank": rank,
+                    "sim_time": sim_time,
+                    "system_total": None,
+                    "num_cells": None,
+                    "total_tasks": None,
+                    "per_cell_avg": None,
+                    "per_cell_max": None,
+                    "counts": {},
+                    "line_index": idx,
+                }
+
+            # "Total = ... (per cell = ...)"
+            avg_m = _RE_ENGINE_TASK_TOTAL_PER_CELL.match(body)
+            if avg_m:
+                try:
+                    current_block["total_tasks"] = int(avg_m.group("total"))
+                except ValueError:
+                    pass
+                try:
+                    current_block["per_cell_avg"] = float(
+                        avg_m.group("per_cell")
+                    )
+                except ValueError:
+                    pass
+                continue
+
+            # "Total = ... (maximum per cell = ...)"
+            max_m = _RE_ENGINE_TASK_TOTAL_MAX_PER_CELL.match(body)
+            if max_m:
+                try:
+                    current_block["total_tasks"] = int(max_m.group("total"))
+                except ValueError:
+                    pass
+                try:
+                    current_block["per_cell_max"] = float(
+                        max_m.group("per_cell")
+                    )
+                except ValueError:
+                    pass
+                continue
+
+            # "task counts are [ name=value ... ]"
+            counts_m = _RE_ENGINE_TASK_COUNTS_BODY.match(body)
+            if counts_m:
+                counts_body = counts_m.group("body")
+                counts: Dict[str, int] = {}
+                for token in counts_body.split():
+                    if "=" not in token:
+                        continue
+                    name, val = token.split("=", 1)
+                    name = name.strip()
+                    val = val.strip().rstrip(",")
+                    if not name:
+                        continue
+                    try:
+                        counts[name] = int(val)
+                    except ValueError:
+                        continue
+
+                current_block["counts"] = counts
+
+                snap = TaskCountSnapshot(
+                    step=current_block["step"],
+                    rank=current_block["rank"],
+                    sim_time=current_block["sim_time"],
+                    system_total=current_block["system_total"],
+                    num_cells=current_block["num_cells"],
+                    total_tasks=current_block["total_tasks"],
+                    per_cell_avg=current_block["per_cell_avg"],
+                    per_cell_max=current_block["per_cell_max"],
+                    counts=current_block["counts"],
+                    line_index=current_block["line_index"],
+                )
+
+                snapshots_by_step.setdefault(current_block["step"], []).append(
+                    snap
+                )
+                current_block = None
+                continue
+
+            # Any other engine_print_task_counts variants are ignored.
+
+    return snapshots_by_step, step_lines

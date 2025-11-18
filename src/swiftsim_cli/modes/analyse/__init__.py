@@ -7,6 +7,7 @@ simulation data:
 - Gravity checks: Force accuracy validation and error analysis
 - Error maps: Gravity error visualization and mapping
 - Log timing: Performance profiling and timing analysis with plots
+- Task counts: Analyse engine_print_task_counts output for task distribution
 - Timer classification: Automatic function vs operation timer detection
 
 Each analysis type is implemented in its own submodule for better organization
@@ -17,6 +18,7 @@ import argparse
 
 from .gravity_checks import run_gravity_checks
 from .gravity_error_maps import run_gravity_error_maps
+from .log_task_counts import run_swift_task_counts
 from .log_timing import run_swift_log_timing
 from .timesteps import run_timestep
 
@@ -33,6 +35,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     # Import and set up each submodule's arguments
     from .gravity_checks import add_gravity_checks_arguments
     from .gravity_error_maps import add_gravity_error_maps_arguments
+    from .log_task_counts import add_task_counts_arguments
     from .log_timing import add_log_arguments
     from .timesteps import add_timestep_arguments
 
@@ -40,6 +43,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     add_gravity_checks_arguments(subparsers)
     add_gravity_error_maps_arguments(subparsers)
     add_log_arguments(subparsers)
+    add_task_counts_arguments(subparsers)
 
 
 def run(args: argparse.Namespace) -> None:
@@ -52,11 +56,14 @@ def run(args: argparse.Namespace) -> None:
         run_gravity_error_maps(args)
     elif args.analysis_type == "log":
         run_swift_log_timing(args)
+    elif args.analysis_type == "task-counts":
+        run_swift_task_counts(args)
     else:
         raise ValueError(f"Unknown analysis type: {args.analysis_type}")
 
 
 # Import functions for backward compatibility and external access
+from .log_task_counts import analyse_swift_task_counts
 from .log_timing import analyse_swift_log_timings
 from .timer_classification import classify_timers_by_max_time
 from .timesteps import analyse_timestep_files
@@ -66,9 +73,11 @@ __all__ = [
     "run",
     "run_timestep",
     "run_swift_log_timing",
+    "run_swift_task_counts",
     "run_gravity_checks",
     "run_gravity_error_maps",
     "analyse_timestep_files",
     "analyse_swift_log_timings",
+    "analyse_swift_task_counts",
     "classify_timers_by_max_time",
 ]
