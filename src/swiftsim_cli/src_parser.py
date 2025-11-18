@@ -1146,6 +1146,11 @@ _RE_ENGINE_TASK_COUNTS_BODY = re.compile(
     r"^task counts are\s*\[(?P<body>.*)\]\s*$"
 )
 
+# Regex to match step table data lines (start with spaces, then step number)
+_RE_STEP_TABLE_LINE = re.compile(
+    r"^\s+(?P<step>\d+)\s+(?P<time>[0-9.eE+\-]+)\s+"
+)
+
 
 def scan_task_counts_by_step(
     log_file: str,
@@ -1177,6 +1182,20 @@ def scan_task_counts_by_step(
         "engine_print_task_counts blocks..."
     )
 
+    # First pass: build step → simulation time mapping from step table
+    print("  Extracting simulation times from step table...")
+    step_to_sim_time: Dict[int, float] = {}
+    with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            line = line.rstrip("\n")
+            m = _RE_STEP_TABLE_LINE.match(line)
+            if m:
+                step = int(m.group("step"))
+                sim_time = float(m.group("time"))
+                step_to_sim_time[step] = sim_time
+
+    print(f"  Found simulation times for {len(step_to_sim_time)} steps")
+
     current_step: Optional[int] = None
     current_block: Optional[Dict[str, Any]] = None
 
@@ -1201,7 +1220,14 @@ def scan_task_counts_by_step(
                 continue
 
             body = m.group("body").strip()
-            sim_time = float(m.group("time"))
+
+            # Get simulation time from step table, fallback to wallclock
+            # if unavailable
+            if current_step is not None and current_step in step_to_sim_time:
+                sim_time = step_to_sim_time[current_step]
+            else:
+                # Fallback: use wallclock time from [time] field
+                sim_time = float(m.group("time"))
 
             # Header line: "System total: ..., no. cells: ..."
             header_m = _RE_ENGINE_TASK_HEADER.match(body)
