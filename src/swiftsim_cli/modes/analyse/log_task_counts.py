@@ -239,7 +239,8 @@ def analyse_swift_task_counts(
             if not snaps:
                 continue
 
-            snap = next((s for s in snaps if s.rank == 0), snaps[0])
+            # Just take the first snapshot for this step
+            snap = snaps[0]
 
             steps.append(step)
             sim_times.append(snap.sim_time)
@@ -313,7 +314,7 @@ def analyse_swift_task_counts(
     if len(all_data) > 1:
         ax.legend()
     ax.set_xlabel("Simulation time")
-    ax.set_ylabel(f"Total tasks per step (rank 0 preferred){ylabel_suffix}")
+    ax.set_ylabel(f"Total tasks per step{ylabel_suffix}")
     ax.set_title(f"engine_print_task_counts: per-step totals{title_suffix}")
     ax.grid(True, alpha=0.3, linestyle="--")
 

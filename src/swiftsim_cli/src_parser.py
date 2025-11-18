@@ -1103,11 +1103,10 @@ class TaskCountSnapshot:
     """One engine_print_task_counts block discovered in a log.
 
     This represents the four-line summary printed once per step by
-    engine_print_task_counts() on (typically) rank 0.
+    engine_print_task_counts().
     """
 
     step: Optional[int]
-    rank: int
     sim_time: float
     system_total: Optional[int]
     num_cells: Optional[int]
@@ -1119,8 +1118,12 @@ class TaskCountSnapshot:
 
 
 # engine_print_task_counts:
+# Matches both formats:
+#   [rank] [time] engine_print_task_counts: ...
+#   [time] engine_print_task_counts: ...
+# We ignore the rank part and just extract time and body
 _RE_ENGINE_TASK_COUNTS = re.compile(
-    r"^\[(?P<rank>\d+)\]\s+\[(?P<time>[0-9.]+)\]"
+    r"^(?:\[\d+\]\s+)?\[(?P<time>[0-9.]+)\]"
     r"\s+engine_print_task_counts:\s*(?P<body>.*)$"
 )
 
@@ -1198,7 +1201,6 @@ def scan_task_counts_by_step(
                 continue
 
             body = m.group("body").strip()
-            rank = int(m.group("rank"))
             sim_time = float(m.group("time"))
 
             # Header line: "System total: ..., no. cells: ..."
@@ -1208,7 +1210,6 @@ def scan_task_counts_by_step(
                 # "task counts are [...]".
                 current_block = {
                     "step": current_step,
-                    "rank": rank,
                     "sim_time": sim_time,
                     "system_total": int(header_m.group("system_total")),
                     "num_cells": int(header_m.group("cells")),
@@ -1226,7 +1227,6 @@ def scan_task_counts_by_step(
             if current_block is None:
                 current_block = {
                     "step": current_step,
-                    "rank": rank,
                     "sim_time": sim_time,
                     "system_total": None,
                     "num_cells": None,
@@ -1289,7 +1289,6 @@ def scan_task_counts_by_step(
 
                 snap = TaskCountSnapshot(
                     step=current_block["step"],
-                    rank=current_block["rank"],
                     sim_time=current_block["sim_time"],
                     system_total=current_block["system_total"],
                     num_cells=current_block["num_cells"],

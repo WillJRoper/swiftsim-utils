@@ -206,7 +206,6 @@ class TestAnalyseSwiftTaskCounts:
         # Create mock snapshots
         mock_snap1 = TaskCountSnapshot(
             step=0,
-            rank=0,
             sim_time=0.1,
             system_total=1000,
             num_cells=10,
@@ -218,7 +217,6 @@ class TestAnalyseSwiftTaskCounts:
         )
         mock_snap2 = TaskCountSnapshot(
             step=1,
-            rank=0,
             sim_time=0.2,
             system_total=1200,
             num_cells=10,
@@ -267,7 +265,6 @@ class TestAnalyseSwiftTaskCounts:
         # Create mock snapshots
         mock_snap1 = TaskCountSnapshot(
             step=0,
-            rank=0,
             sim_time=0.1,
             system_total=1000,
             num_cells=10,
@@ -279,7 +276,6 @@ class TestAnalyseSwiftTaskCounts:
         )
         mock_snap2 = TaskCountSnapshot(
             step=1,
-            rank=0,
             sim_time=0.2,
             system_total=1200,
             num_cells=10,
@@ -353,7 +349,6 @@ class TestAnalyseSwiftTaskCounts:
         # Create mock snapshots for first log
         mock_snap1_log1 = TaskCountSnapshot(
             step=0,
-            rank=0,
             sim_time=0.1,
             system_total=1000,
             num_cells=10,
@@ -367,7 +362,6 @@ class TestAnalyseSwiftTaskCounts:
         # Create mock snapshots for second log
         mock_snap1_log2 = TaskCountSnapshot(
             step=0,
-            rank=0,
             sim_time=0.1,
             system_total=1500,
             num_cells=15,
