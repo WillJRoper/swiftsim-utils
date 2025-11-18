@@ -409,6 +409,7 @@ def analyse_swift_task_counts(
             np.linspace(0, 1, len(tasks_to_plot))
         )
 
+        # Plot data without labels first
         for task_idx, task_name in enumerate(tasks_to_plot):
             for log_idx, data in enumerate(all_data):
                 if task_name not in data["task_series"]:
@@ -420,12 +421,6 @@ def analyse_swift_task_counts(
                 if not np.any(nonzero_mask):
                     continue
 
-                # Create label only for first log to avoid duplicate legend
-                if len(all_data) == 1:
-                    label = task_name
-                else:
-                    label = f"{task_name} ({data['label']})"
-
                 ax.scatter(
                     data["times"][nonzero_mask],
                     task_counts[nonzero_mask],
@@ -433,7 +428,6 @@ def analyse_swift_task_counts(
                     s=20,
                     alpha=0.6,
                     color=colors[task_idx],
-                    label=label,
                 )
 
         ax.set_xlabel("Simulation time")
@@ -441,7 +435,54 @@ def analyse_swift_task_counts(
         ax.set_title("Individual task types evolution")
         ax.set_yscale("log")
         ax.grid(True, alpha=0.3, linestyle="--", which="both")
-        ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=8)
+
+        # Create two separate legends
+        from matplotlib.lines import Line2D
+
+        # Legend 1: Task types (colors)
+        task_handles = [
+            Line2D(
+                [0],
+                [0],
+                marker="o",
+                color="w",
+                markerfacecolor=colors[i],
+                markersize=8,
+                label=task_name,
+            )
+            for i, task_name in enumerate(tasks_to_plot)
+        ]
+        legend1 = ax.legend(
+            handles=task_handles,
+            title="Task Types",
+            bbox_to_anchor=(1.05, 1),
+            loc="upper left",
+            fontsize=8,
+        )
+
+        # Legend 2: Log files (markers) - only if multiple logs
+        if len(all_data) > 1:
+            marker_handles = [
+                Line2D(
+                    [0],
+                    [0],
+                    marker=data["marker"],
+                    color="w",
+                    markerfacecolor="gray",
+                    markersize=8,
+                    label=data["label"],
+                )
+                for data in all_data
+            ]
+            ax.legend(
+                handles=marker_handles,
+                title="Log Files",
+                bbox_to_anchor=(1.05, 0.5),
+                loc="upper left",
+                fontsize=8,
+            )
+            # Add both legends to the plot
+            ax.add_artist(legend1)
 
         p3 = create_output_path(
             output_path, prefix, "task_counts_by_type.png", out_dir
