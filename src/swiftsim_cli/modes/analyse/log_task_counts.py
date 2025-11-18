@@ -21,16 +21,28 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import List
+from typing import List, TypedDict
 
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.typing import NDArray
 
 from swiftsim_cli.src_parser import (
     TaskCountSnapshot,
     scan_task_counts_by_step,
 )
 from swiftsim_cli.utilities import create_output_path
+
+
+class LogData(TypedDict):
+    """Type definition for log file data."""
+
+    log_file: str
+    times: NDArray[np.float64]
+    totals: NDArray[np.float64]
+    cumulative: NDArray[np.float64]
+    marker: str
+
 
 __all__ = [
     "add_task_counts_arguments",
@@ -58,8 +70,10 @@ def add_task_counts_arguments(subparsers) -> None:
     )
 
     task_parser.add_argument(
-        "log_file",
-        help="SWIFT log file to analyse.",
+        "log_files",
+        nargs="+",
+        help="SWIFT log file(s) to analyse. Multiple files will be "
+        "plotted together with different markers.",
         type=Path,
     )
 
@@ -106,7 +120,7 @@ def run_swift_task_counts(args: argparse.Namespace) -> None:
     This mirrors run_swift_log_timing() and simply forwards args.
     """
     analyse_swift_task_counts(
-        log_file=str(args.log_file),
+        log_files=[str(f) for f in args.log_files],
         output_path=str(args.output_path) if args.output_path else None,
         prefix=args.prefix,
         show_plot=args.show,
@@ -120,15 +134,16 @@ def run_swift_task_counts(args: argparse.Namespace) -> None:
 
 
 def analyse_swift_task_counts(
-    log_file: str,
+    log_files: list[str],
     output_path: str | None = None,
     prefix: str | None = None,
     show_plot: bool = True,
     task_filter: list[str] | None = None,
 ) -> None:
-    """Analyse engine_print_task_counts blocks in a SWIFT log.
+    """Analyse engine_print_task_counts blocks in SWIFT log files.
 
     This function:
+      * Accepts multiple log files for comparison
       * Uses scan_task_counts_by_step() to extract per-step task-count
         snapshots keyed by step number.
       * Collapses snapshots per step to a single series, preferring rank 0.
@@ -136,10 +151,11 @@ def analyse_swift_task_counts(
       * Builds:
           - A scatter plot of total tasks vs simulation time.
           - A cumulative total tasks vs simulation time plot.
+      * Each log file gets a different marker on the plots.
 
     Args:
-        log_file:
-            Path to the SWIFT log file to analyse.
+        log_files:
+            List of paths to SWIFT log files to analyse.
         output_path:
             Directory where figures are saved. If None, saves to CWD.
         prefix:
@@ -150,7 +166,9 @@ def analyse_swift_task_counts(
             Optional list of task names to include. If None, all tasks
             are included.
     """
-    print(f"Analyzing engine_print_task_counts in log:  {log_file}")
+    print(
+        f"Analyzing engine_print_task_counts in {len(log_files)} log file(s)"
+    )
 
     if task_filter:
         print(f"Filtering for specific tasks: {', '.join(task_filter)}")
@@ -162,69 +180,84 @@ def analyse_swift_task_counts(
         else f"{prefix}_task_counts_analysis"
     )
 
-    # ------------------------------------------------------------------
-    # Parse the log with the fast streaming parser from src_parser
-    # ------------------------------------------------------------------
-    snapshots_by_step, step_lines = scan_task_counts_by_step(log_file)
-
-    total_snapshots = sum(len(v) for v in snapshots_by_step.values())
-    print(
-        f"Found {total_snapshots} engine_print_task_counts snapshots "
-        f"across {len(snapshots_by_step)} steps (step-lines: "
-        f"{len(step_lines)})."
-    )
+    # Define markers for different log files
+    markers = ["o", "s", "^", "D", "v", "<", ">", "p", "*", "h"]
 
     # ------------------------------------------------------------------
-    # Build a time series: simulation time vs total tasks (prefer rank 0)
+    # Process each log file
     # ------------------------------------------------------------------
-    steps: List[int] = []
-    sim_times: List[float] = []
-    totals: List[int] = []
+    all_data: list[LogData] = []
 
-    # Only consider entries with a valid step number
-    for step in sorted(k for k in snapshots_by_step.keys() if k is not None):
-        snaps: list[TaskCountSnapshot] = snapshots_by_step[step]
-        if not snaps:
+    for log_idx, log_file in enumerate(log_files):
+        print(f"\nLog {log_idx + 1}/{len(log_files)}: {log_file}")
+
+        # Parse the log
+        snapshots_by_step, step_lines = scan_task_counts_by_step(log_file)
+
+        total_snapshots = sum(len(v) for v in snapshots_by_step.values())
+        print(
+            f"  Found {total_snapshots} snapshots across "
+            f"{len(snapshots_by_step)} steps"
+        )
+
+        # Build time series
+        steps: List[int] = []
+        sim_times: List[float] = []
+        totals: List[int] = []
+
+        for step in sorted(
+            k for k in snapshots_by_step.keys() if k is not None
+        ):
+            snaps: list[TaskCountSnapshot] = snapshots_by_step[step]
+            if not snaps:
+                continue
+
+            snap = next((s for s in snaps if s.rank == 0), snaps[0])
+
+            steps.append(step)
+            sim_times.append(snap.sim_time)
+
+            # Calculate total tasks
+            if task_filter:
+                total = sum(
+                    snap.counts.get(task_name, 0) for task_name in task_filter
+                )
+                totals.append(total)
+            else:
+                if snap.total_tasks is not None:
+                    totals.append(int(snap.total_tasks))
+                elif snap.system_total is not None:
+                    totals.append(int(snap.system_total))
+                else:
+                    totals.append(0)
+
+        if not steps:
+            print("  WARNING: No usable data found in this log")
             continue
 
-        # Prefer rank 0 if present, otherwise fall back to the first snapshot
-        snap = next((s for s in snaps if s.rank == 0), snaps[0])
+        steps_arr = np.asarray(steps, dtype=int)
+        times_arr = np.asarray(sim_times, dtype=float)
+        totals_arr = np.asarray(totals, dtype=float)
+        cumulative_arr = np.cumsum(totals_arr)
 
-        steps.append(step)
-        sim_times.append(snap.sim_time)
-
-        # Calculate total tasks for this step
-        if task_filter:
-            # Sum only the specified tasks
-            total = sum(
-                snap.counts.get(task_name, 0) for task_name in task_filter
-            )
-            totals.append(total)
-        else:
-            # Use total from snapshot if available
-            if snap.total_tasks is not None:
-                totals.append(int(snap.total_tasks))
-            elif snap.system_total is not None:
-                totals.append(int(snap.system_total))
-            else:
-                totals.append(0)
-
-    if not steps:
         print(
-            "No usable engine_print_task_counts blocks with step "
-            "numbers found."
+            f"  Prepared time series: {len(steps_arr)} steps "
+            f"(step {steps_arr.min()} - {steps_arr.max()})"
         )
+
+        all_data.append(
+            {
+                "log_file": log_file,
+                "times": times_arr,
+                "totals": totals_arr,
+                "cumulative": cumulative_arr,
+                "marker": markers[log_idx % len(markers)],
+            }
+        )
+
+    if not all_data:
+        print("\nNo usable data found in any log files!")
         return
-
-    steps_arr = np.asarray(steps, dtype=int)
-    times_arr = np.asarray(sim_times, dtype=float)
-    totals_arr = np.asarray(totals, dtype=float)
-    cumulative_arr = np.cumsum(totals_arr)
-
-    print(
-        f"Prepared time series for {len(steps_arr)} steps "
-        f"(min step={steps_arr.min()}, max step={steps_arr.max()})."
-    )
 
     # ------------------------------------------------------------------
     # Plot 1: Scatter of total tasks vs simulation time
@@ -241,7 +274,17 @@ def analyse_swift_task_counts(
         ylabel_suffix = ""
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.scatter(times_arr, totals_arr, alpha=0.7)
+    for data in all_data:
+        label = Path(data["log_file"]).name
+        ax.scatter(
+            data["times"],
+            data["totals"],
+            marker=data["marker"],
+            alpha=0.7,
+            label=label,
+        )
+    if len(all_data) > 1:
+        ax.legend()
     ax.set_xlabel("Simulation time")
     ax.set_ylabel(f"Total tasks per step (rank 0 preferred){ylabel_suffix}")
     ax.set_title(f"engine_print_task_counts: per-step totals{title_suffix}")
@@ -261,7 +304,16 @@ def analyse_swift_task_counts(
     print("Creating cumulative task-count plot...")
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(times_arr, cumulative_arr, marker="o")
+    for data in all_data:
+        label = Path(data["log_file"]).name
+        ax.plot(
+            data["times"],
+            data["cumulative"],
+            marker=data["marker"],
+            label=label,
+        )
+    if len(all_data) > 1:
+        ax.legend()
     ax.set_xlabel("Simulation time")
     ax.set_ylabel(f"Cumulative tasks{ylabel_suffix}")
     ax.set_title(

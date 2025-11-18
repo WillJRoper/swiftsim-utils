@@ -28,7 +28,7 @@ class TestTaskCountsArguments:
             ["task-counts", "test.log", "--prefix", "test"]
         )
 
-        assert args.log_file == Path("test.log")
+        assert args.log_files == [Path("test.log")]
         assert args.prefix == "test"
         assert args.show is False
         assert args.tasks is None
@@ -47,8 +47,28 @@ class TestTaskCountsArguments:
             ["task-counts", "test.log", "--tasks", "sort", "self", "pair"]
         )
 
-        assert args.log_file == Path("test.log")
+        assert args.log_files == [Path("test.log")]
         assert args.tasks == ["sort", "self", "pair"]
+
+    def test_add_task_counts_arguments_multiple_logs(self):
+        """Test task counts arguments with multiple log files."""
+        from argparse import ArgumentParser
+
+        parent_parser = ArgumentParser()
+        subparsers = parent_parser.add_subparsers()
+
+        add_task_counts_arguments(subparsers)
+
+        # Parse test arguments with multiple logs
+        args = parent_parser.parse_args(
+            ["task-counts", "test1.log", "test2.log", "test3.log"]
+        )
+
+        assert args.log_files == [
+            Path("test1.log"),
+            Path("test2.log"),
+            Path("test3.log"),
+        ]
 
 
 class TestRunSwiftTaskCounts:
@@ -60,7 +80,7 @@ class TestRunSwiftTaskCounts:
     def test_run_swift_task_counts(self, mock_analyse):
         """Test the CLI entry point calls analyse with correct args."""
         args = Mock()
-        args.log_file = Path("/path/to/test.log")
+        args.log_files = [Path("/path/to/test.log")]
         args.output_path = Path("/output")
         args.prefix = "test"
         args.show = True
@@ -69,7 +89,7 @@ class TestRunSwiftTaskCounts:
         run_swift_task_counts(args)
 
         mock_analyse.assert_called_once_with(
-            log_file=str(args.log_file),
+            log_files=[str(args.log_files[0])],
             output_path=str(args.output_path),
             prefix="test",
             show_plot=True,
@@ -82,7 +102,7 @@ class TestRunSwiftTaskCounts:
     def test_run_swift_task_counts_no_filter(self, mock_analyse):
         """Test the CLI entry point without task filter."""
         args = Mock()
-        args.log_file = Path("/path/to/test.log")
+        args.log_files = [Path("/path/to/test.log")]
         args.output_path = None
         args.prefix = None
         args.show = False
@@ -91,9 +111,37 @@ class TestRunSwiftTaskCounts:
         run_swift_task_counts(args)
 
         mock_analyse.assert_called_once_with(
-            log_file=str(args.log_file),
+            log_files=[str(args.log_files[0])],
             output_path=None,
             prefix=None,
+            show_plot=False,
+            task_filter=None,
+        )
+
+    @patch(
+        "swiftsim_cli.modes.analyse.log_task_counts.analyse_swift_task_counts"
+    )
+    def test_run_swift_task_counts_multiple_logs(self, mock_analyse):
+        """Test the CLI entry point with multiple log files."""
+        args = Mock()
+        args.log_files = [
+            Path("/path/to/test1.log"),
+            Path("/path/to/test2.log"),
+        ]
+        args.output_path = Path("/output")
+        args.prefix = "multi"
+        args.show = False
+        args.tasks = None
+
+        run_swift_task_counts(args)
+
+        mock_analyse.assert_called_once_with(
+            log_files=[
+                str(args.log_files[0]),
+                str(args.log_files[1]),
+            ],
+            output_path=str(args.output_path),
+            prefix="multi",
             show_plot=False,
             task_filter=None,
         )
@@ -169,7 +217,7 @@ class TestAnalyseSwiftTaskCounts:
         log_file = self.create_mock_log(tmp_path)
 
         analyse_swift_task_counts(
-            log_file=log_file,
+            log_files=[log_file],
             output_path=None,
             prefix=None,
             show_plot=False,
@@ -229,7 +277,7 @@ class TestAnalyseSwiftTaskCounts:
         log_file = self.create_mock_log(tmp_path)
 
         analyse_swift_task_counts(
-            log_file=log_file,
+            log_files=[log_file],
             output_path=None,
             prefix=None,
             show_plot=False,
@@ -254,7 +302,7 @@ class TestAnalyseSwiftTaskCounts:
         log_file = self.create_mock_log(tmp_path)
 
         analyse_swift_task_counts(
-            log_file=log_file,
+            log_files=[log_file],
             output_path=None,
             prefix=None,
             show_plot=False,
@@ -263,4 +311,76 @@ class TestAnalyseSwiftTaskCounts:
 
         # Verify appropriate message was printed
         captured = capsys.readouterr()
-        assert "No usable engine_print_task_counts blocks" in captured.out
+        assert "No usable data found in any log files" in captured.out
+
+    @patch("swiftsim_cli.modes.analyse.log_task_counts.create_output_path")
+    @patch("swiftsim_cli.modes.analyse.log_task_counts.plt")
+    @patch(
+        "swiftsim_cli.modes.analyse.log_task_counts.scan_task_counts_by_step"
+    )
+    def test_analyse_swift_task_counts_multiple_logs(
+        self, mock_scan, mock_plt, mock_create_path, tmp_path
+    ):
+        """Test analysis with multiple log files."""
+        # Mock the output path creation
+        mock_create_path.side_effect = lambda *args: tmp_path / "plot.png"
+
+        # Mock matplotlib subplot return
+        mock_fig = Mock()
+        mock_ax = Mock()
+        mock_plt.subplots.return_value = (mock_fig, mock_ax)
+
+        # Create mock snapshots for first log
+        mock_snap1_log1 = TaskCountSnapshot(
+            step=0,
+            rank=0,
+            sim_time=0.1,
+            system_total=1000,
+            num_cells=10,
+            total_tasks=1000,
+            per_cell_avg=100.0,
+            per_cell_max=None,
+            counts={"sort": 200, "self": 300, "pair": 500},
+            line_index=0,
+        )
+
+        # Create mock snapshots for second log
+        mock_snap1_log2 = TaskCountSnapshot(
+            step=0,
+            rank=0,
+            sim_time=0.1,
+            system_total=1500,
+            num_cells=15,
+            total_tasks=1500,
+            per_cell_avg=100.0,
+            per_cell_max=None,
+            counts={"sort": 300, "self": 450, "pair": 750},
+            line_index=0,
+        )
+
+        # Set up mock to return different data for each call
+        mock_scan.side_effect = [
+            ({0: [mock_snap1_log1]}, []),
+            ({0: [mock_snap1_log2]}, []),
+        ]
+
+        log_file1 = self.create_mock_log(tmp_path)
+        log_file2 = tmp_path / "test2.log"
+        log_file2.write_text(
+            "0 [0.100] engine_print_task_counts: "
+            "System total: 1500, no. cells: 15"
+        )
+
+        analyse_swift_task_counts(
+            log_files=[log_file1, str(log_file2)],
+            output_path=None,
+            prefix=None,
+            show_plot=False,
+            task_filter=None,
+        )
+
+        # Verify scan was called twice
+        assert mock_scan.call_count == 2
+
+        # Verify plots were created (2 plots)
+        assert mock_plt.savefig.call_count == 2
