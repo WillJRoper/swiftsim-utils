@@ -81,6 +81,7 @@ class TestRunSwiftTaskCounts:
         """Test the CLI entry point calls analyse with correct args."""
         args = Mock()
         args.log_files = [Path("/path/to/test.log")]
+        args.labels = ["Test Run"]
         args.output_path = Path("/output")
         args.prefix = "test"
         args.show = True
@@ -90,6 +91,7 @@ class TestRunSwiftTaskCounts:
 
         mock_analyse.assert_called_once_with(
             log_files=[str(args.log_files[0])],
+            labels=["Test Run"],
             output_path=str(args.output_path),
             prefix="test",
             show_plot=True,
@@ -103,6 +105,7 @@ class TestRunSwiftTaskCounts:
         """Test the CLI entry point without task filter."""
         args = Mock()
         args.log_files = [Path("/path/to/test.log")]
+        args.labels = None
         args.output_path = None
         args.prefix = None
         args.show = False
@@ -112,6 +115,7 @@ class TestRunSwiftTaskCounts:
 
         mock_analyse.assert_called_once_with(
             log_files=[str(args.log_files[0])],
+            labels=None,
             output_path=None,
             prefix=None,
             show_plot=False,
@@ -128,6 +132,7 @@ class TestRunSwiftTaskCounts:
             Path("/path/to/test1.log"),
             Path("/path/to/test2.log"),
         ]
+        args.labels = ["Run 1", "Run 2"]
         args.output_path = Path("/output")
         args.prefix = "multi"
         args.show = False
@@ -140,6 +145,7 @@ class TestRunSwiftTaskCounts:
                 str(args.log_files[0]),
                 str(args.log_files[1]),
             ],
+            labels=["Run 1", "Run 2"],
             output_path=str(args.output_path),
             prefix="multi",
             show_plot=False,
@@ -149,6 +155,17 @@ class TestRunSwiftTaskCounts:
 
 class TestAnalyseSwiftTaskCounts:
     """Tests for the core task counts analysis function."""
+
+    def test_analyse_swift_task_counts_label_validation(self):
+        """Test that labels must match number of log files."""
+        import pytest
+
+        with pytest.raises(ValueError, match="must match"):
+            analyse_swift_task_counts(
+                log_files=["log1.txt", "log2.txt"],
+                labels=["Label 1"],  # Only one label for two files
+                task_filter=None,
+            )
 
     def create_mock_log(self, tmp_path):
         """Create a mock SWIFT log file with task counts."""
@@ -218,6 +235,7 @@ class TestAnalyseSwiftTaskCounts:
 
         analyse_swift_task_counts(
             log_files=[log_file],
+            labels=None,
             output_path=None,
             prefix=None,
             show_plot=False,
@@ -278,6 +296,7 @@ class TestAnalyseSwiftTaskCounts:
 
         analyse_swift_task_counts(
             log_files=[log_file],
+            labels=None,
             output_path=None,
             prefix=None,
             show_plot=False,
@@ -303,6 +322,7 @@ class TestAnalyseSwiftTaskCounts:
 
         analyse_swift_task_counts(
             log_files=[log_file],
+            labels=None,
             output_path=None,
             prefix=None,
             show_plot=False,
@@ -373,6 +393,7 @@ class TestAnalyseSwiftTaskCounts:
 
         analyse_swift_task_counts(
             log_files=[log_file1, str(log_file2)],
+            labels=["Log 1", "Log 2"],
             output_path=None,
             prefix=None,
             show_plot=False,

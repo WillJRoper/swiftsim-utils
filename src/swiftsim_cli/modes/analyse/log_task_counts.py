@@ -42,6 +42,7 @@ class LogData(TypedDict):
     totals: NDArray[np.float64]
     cumulative: NDArray[np.float64]
     marker: str
+    label: str
 
 
 __all__ = [
@@ -75,6 +76,16 @@ def add_task_counts_arguments(subparsers) -> None:
         help="SWIFT log file(s) to analyse. Multiple files will be "
         "plotted together with different markers.",
         type=Path,
+    )
+
+    task_parser.add_argument(
+        "--labels",
+        "-l",
+        nargs="+",
+        help="Labels for the log files (same order as files). "
+        "If not specified, filenames will be used.",
+        type=str,
+        default=None,
     )
 
     task_parser.add_argument(
@@ -121,6 +132,7 @@ def run_swift_task_counts(args: argparse.Namespace) -> None:
     """
     analyse_swift_task_counts(
         log_files=[str(f) for f in args.log_files],
+        labels=args.labels,
         output_path=str(args.output_path) if args.output_path else None,
         prefix=args.prefix,
         show_plot=args.show,
@@ -135,6 +147,7 @@ def run_swift_task_counts(args: argparse.Namespace) -> None:
 
 def analyse_swift_task_counts(
     log_files: list[str],
+    labels: list[str] | None = None,
     output_path: str | None = None,
     prefix: str | None = None,
     show_plot: bool = True,
@@ -156,6 +169,9 @@ def analyse_swift_task_counts(
     Args:
         log_files:
             List of paths to SWIFT log files to analyse.
+        labels:
+            Optional list of labels for the log files. If None, filenames
+            will be used. Must match the order and length of log_files.
         output_path:
             Directory where figures are saved. If None, saves to CWD.
         prefix:
@@ -169,6 +185,17 @@ def analyse_swift_task_counts(
     print(
         f"Analyzing engine_print_task_counts in {len(log_files)} log file(s)"
     )
+
+    # Validate labels if provided
+    if labels is not None:
+        if len(labels) != len(log_files):
+            raise ValueError(
+                f"Number of labels ({len(labels)}) must match "
+                f"number of log files ({len(log_files)})"
+            )
+    else:
+        # Use filenames as labels
+        labels = [Path(f).name for f in log_files]
 
     if task_filter:
         print(f"Filtering for specific tasks: {', '.join(task_filter)}")
@@ -252,6 +279,7 @@ def analyse_swift_task_counts(
                 "totals": totals_arr,
                 "cumulative": cumulative_arr,
                 "marker": markers[log_idx % len(markers)],
+                "label": labels[log_idx],
             }
         )
 
@@ -275,13 +303,12 @@ def analyse_swift_task_counts(
 
     fig, ax = plt.subplots(figsize=(10, 6))
     for data in all_data:
-        label = Path(data["log_file"]).name
         ax.scatter(
             data["times"],
             data["totals"],
             marker=data["marker"],
             alpha=0.7,
-            label=label,
+            label=data["label"],
         )
     if len(all_data) > 1:
         ax.legend()
@@ -305,12 +332,11 @@ def analyse_swift_task_counts(
 
     fig, ax = plt.subplots(figsize=(10, 6))
     for data in all_data:
-        label = Path(data["log_file"]).name
         ax.plot(
             data["times"],
             data["cumulative"],
             marker=data["marker"],
-            label=label,
+            label=data["label"],
         )
     if len(all_data) > 1:
         ax.legend()
