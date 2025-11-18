@@ -87,6 +87,18 @@ def add_task_counts_arguments(subparsers) -> None:
         default=False,
     )
 
+    task_parser.add_argument(
+        "--tasks",
+        "-t",
+        type=str,
+        nargs="+",
+        help="List of specific task names to include in the analysis. "
+        "Task names must match the task strings in the log "
+        "(e.g., 'sort', 'self', 'pair'). If not specified, all tasks "
+        "are included.",
+        default=None,
+    )
+
 
 def run_swift_task_counts(args: argparse.Namespace) -> None:
     """Entry point for the 'task-counts' CLI subcommand.
@@ -98,6 +110,7 @@ def run_swift_task_counts(args: argparse.Namespace) -> None:
         output_path=str(args.output_path) if args.output_path else None,
         prefix=args.prefix,
         show_plot=args.show,
+        task_filter=args.tasks,
     )
 
 
@@ -111,6 +124,7 @@ def analyse_swift_task_counts(
     output_path: str | None = None,
     prefix: str | None = None,
     show_plot: bool = True,
+    task_filter: list[str] | None = None,
 ) -> None:
     """Analyse engine_print_task_counts blocks in a SWIFT log.
 
@@ -118,6 +132,7 @@ def analyse_swift_task_counts(
       * Uses scan_task_counts_by_step() to extract per-step task-count
         snapshots keyed by step number.
       * Collapses snapshots per step to a single series, preferring rank 0.
+      * Optionally filters to include only specific task types.
       * Builds:
           - A scatter plot of total tasks vs simulation time.
           - A cumulative total tasks vs simulation time plot.
@@ -131,8 +146,14 @@ def analyse_swift_task_counts(
             Optional filename and output-subdirectory prefix.
         show_plot:
             Whether to display plots interactively.
+        task_filter:
+            Optional list of task names to include. If None, all tasks
+            are included.
     """
     print(f"Analyzing engine_print_task_counts in log:  {log_file}")
+
+    if task_filter:
+        print(f"Filtering for specific tasks: {', '.join(task_filter)}")
 
     # Consistent with your other analysis: prefix determines output directory.
     out_dir = (
@@ -172,13 +193,21 @@ def analyse_swift_task_counts(
         steps.append(step)
         sim_times.append(snap.sim_time)
 
-        # Prefer "Total =" value for this rank, fall back to system_total
-        if snap.total_tasks is not None:
-            totals.append(int(snap.total_tasks))
-        elif snap.system_total is not None:
-            totals.append(int(snap.system_total))
+        # Calculate total tasks for this step
+        if task_filter:
+            # Sum only the specified tasks
+            total = sum(
+                snap.counts.get(task_name, 0) for task_name in task_filter
+            )
+            totals.append(total)
         else:
-            totals.append(0)
+            # Use total from snapshot if available
+            if snap.total_tasks is not None:
+                totals.append(int(snap.total_tasks))
+            elif snap.system_total is not None:
+                totals.append(int(snap.system_total))
+            else:
+                totals.append(0)
 
     if not steps:
         print(
@@ -202,11 +231,20 @@ def analyse_swift_task_counts(
     # ------------------------------------------------------------------
     print("Creating per-step task-count scatter plot...")
 
+    # Build plot titles based on whether filtering is active
+    if task_filter:
+        task_list = ", ".join(task_filter)
+        title_suffix = f" (filtered: {task_list})"
+        ylabel_suffix = " - filtered tasks"
+    else:
+        title_suffix = ""
+        ylabel_suffix = ""
+
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.scatter(times_arr, totals_arr, alpha=0.7)
     ax.set_xlabel("Simulation time")
-    ax.set_ylabel("Total tasks per step (rank 0 preferred)")
-    ax.set_title("engine_print_task_counts: per-step totals")
+    ax.set_ylabel(f"Total tasks per step (rank 0 preferred){ylabel_suffix}")
+    ax.set_title(f"engine_print_task_counts: per-step totals{title_suffix}")
     ax.grid(True, alpha=0.3, linestyle="--")
 
     p1 = create_output_path(
@@ -225,8 +263,10 @@ def analyse_swift_task_counts(
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.plot(times_arr, cumulative_arr, marker="o")
     ax.set_xlabel("Simulation time")
-    ax.set_ylabel("Cumulative tasks")
-    ax.set_title("engine_print_task_counts: cumulative total tasks")
+    ax.set_ylabel(f"Cumulative tasks{ylabel_suffix}")
+    ax.set_title(
+        f"engine_print_task_counts: cumulative total tasks{title_suffix}"
+    )
     ax.grid(True, alpha=0.3, linestyle="--")
 
     p2 = create_output_path(
