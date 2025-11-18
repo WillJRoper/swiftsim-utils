@@ -286,6 +286,44 @@ def analyse_swift_task_counts(
             f"(step {steps_arr.min()} - {steps_arr.max()})"
         )
 
+        # Print diagnostic table for this log
+        print("\n  Task Count Summary:")
+        print("  " + "=" * 70)
+        print(
+            f"  {'Task Type':<20} {'Total':<15} {'Avg/Step':<15} "
+            f"{'Max/Step':<15}"
+        )
+        print("  " + "-" * 70)
+
+        # Overall totals row
+        total_all = totals_arr.sum()
+        avg_all = totals_arr.mean()
+        max_all = totals_arr.max()
+        print(
+            f"  {'ALL TASKS':<20} {total_all:<15,.0f} {avg_all:<15,.2f} "
+            f"{max_all:<15,.0f}"
+        )
+        print("  " + "-" * 70)
+
+        # Individual task type rows (sorted by total count descending)
+        task_totals = []
+        for task_name in sorted(task_series.keys()):
+            task_arr = task_series[task_name]
+            task_total = task_arr.sum()
+            task_avg = task_arr.mean()
+            task_max = task_arr.max()
+            task_totals.append((task_name, task_total, task_avg, task_max))
+
+        # Sort by total descending
+        task_totals.sort(key=lambda x: x[1], reverse=True)
+
+        for task_name, task_total, task_avg, task_max in task_totals:
+            print(
+                f"  {task_name:<20} {task_total:<15,.0f} {task_avg:<15,.2f} "
+                f"{task_max:<15,.0f}"
+            )
+        print("  " + "=" * 70)
+
         all_data.append(
             {
                 "log_file": log_file,
