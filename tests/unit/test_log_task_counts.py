@@ -243,8 +243,8 @@ class TestAnalyseSwiftTaskCounts:
         # Verify scan was called
         mock_scan.assert_called_once_with(log_file)
 
-        # Verify plots were created (2 plots)
-        assert mock_plt.savefig.call_count == 2
+        # Verify plots were created (3 plots: per-step, cumulative, by-type)
+        assert mock_plt.savefig.call_count == 3
 
     @patch("swiftsim_cli.modes.analyse.log_task_counts.create_output_path")
     @patch("swiftsim_cli.modes.analyse.log_task_counts.plt")
@@ -302,8 +302,8 @@ class TestAnalyseSwiftTaskCounts:
         # Verify scan was called
         mock_scan.assert_called_once_with(log_file)
 
-        # Verify plots were created (2 plots)
-        assert mock_plt.savefig.call_count == 2
+        # Verify plots were created (3 plots: per-step, cumulative, by-type)
+        assert mock_plt.savefig.call_count == 3
 
     @patch(
         "swiftsim_cli.modes.analyse.log_task_counts.scan_task_counts_by_step"
@@ -397,5 +397,5 @@ class TestAnalyseSwiftTaskCounts:
         # Verify scan was called twice
         assert mock_scan.call_count == 2
 
-        # Verify plots were created (2 plots)
-        assert mock_plt.savefig.call_count == 2
+        # Verify plots were created (3 plots: per-step, cumulative, by-type)
+        assert mock_plt.savefig.call_count == 3

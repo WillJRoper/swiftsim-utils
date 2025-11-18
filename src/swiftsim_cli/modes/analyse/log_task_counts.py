@@ -43,6 +43,7 @@ class LogData(TypedDict):
     cumulative: NDArray[np.float64]
     marker: str
     label: str
+    task_series: dict[str, NDArray[np.float64]]
 
 
 __all__ = [
@@ -231,6 +232,7 @@ def analyse_swift_task_counts(
         steps: List[int] = []
         sim_times: List[float] = []
         totals: List[int] = []
+        task_counts_per_step: dict[str, list[int]] = {}
 
         for step in sorted(
             k for k in snapshots_by_step.keys() if k is not None
@@ -244,6 +246,12 @@ def analyse_swift_task_counts(
 
             steps.append(step)
             sim_times.append(snap.sim_time)
+
+            # Store individual task counts
+            for task_name, count in snap.counts.items():
+                if task_name not in task_counts_per_step:
+                    task_counts_per_step[task_name] = []
+                task_counts_per_step[task_name].append(count)
 
             # Calculate total tasks
             if task_filter:
@@ -268,6 +276,11 @@ def analyse_swift_task_counts(
         totals_arr = np.asarray(totals, dtype=float)
         cumulative_arr = np.cumsum(totals_arr)
 
+        # Convert individual task counts to numpy arrays
+        task_series: dict[str, NDArray[np.float64]] = {}
+        for task_name, counts in task_counts_per_step.items():
+            task_series[task_name] = np.asarray(counts, dtype=float)
+
         print(
             f"  Prepared time series: {len(steps_arr)} steps "
             f"(step {steps_arr.min()} - {steps_arr.max()})"
@@ -281,6 +294,7 @@ def analyse_swift_task_counts(
                 "cumulative": cumulative_arr,
                 "marker": markers[log_idx % len(markers)],
                 "label": labels[log_idx],
+                "task_series": task_series,
             }
         )
 
@@ -308,6 +322,7 @@ def analyse_swift_task_counts(
             data["times"],
             data["totals"],
             marker=data["marker"],
+            s=20,
             alpha=0.7,
             label=data["label"],
         )
@@ -316,7 +331,8 @@ def analyse_swift_task_counts(
     ax.set_xlabel("Simulation time")
     ax.set_ylabel(f"Total tasks per step{ylabel_suffix}")
     ax.set_title(f"engine_print_task_counts: per-step totals{title_suffix}")
-    ax.grid(True, alpha=0.3, linestyle="--")
+    ax.set_yscale("log")
+    ax.grid(True, alpha=0.3, linestyle="--", which="both")
 
     p1 = create_output_path(
         output_path, prefix, "task_counts_per_step.png", out_dir
@@ -337,6 +353,7 @@ def analyse_swift_task_counts(
             data["times"],
             data["cumulative"],
             marker=data["marker"],
+            markersize=4,
             label=data["label"],
         )
     if len(all_data) > 1:
@@ -346,7 +363,8 @@ def analyse_swift_task_counts(
     ax.set_title(
         f"engine_print_task_counts: cumulative total tasks{title_suffix}"
     )
-    ax.grid(True, alpha=0.3, linestyle="--")
+    ax.set_yscale("log")
+    ax.grid(True, alpha=0.3, linestyle="--", which="both")
 
     p2 = create_output_path(
         output_path, prefix, "task_counts_cumulative.png", out_dir
@@ -356,6 +374,89 @@ def analyse_swift_task_counts(
         plt.show()
     plt.close()
 
-    print("\nCreated task-count plots:")
-    print(f"  - {p1}")
-    print(f"  - {p2}")
+    # ------------------------------------------------------------------
+    # Plot 3: Individual task types vs simulation time
+    # ------------------------------------------------------------------
+    print("Creating individual task types scatter plot...")
+
+    # Collect all unique task names across all logs
+    all_task_names: set[str] = set()
+    for data in all_data:
+        all_task_names.update(data["task_series"].keys())
+
+    # Filter to only include non-zero tasks or specified tasks
+    tasks_to_plot: list[str]
+    if task_filter:
+        tasks_to_plot = [t for t in task_filter if t in all_task_names]
+    else:
+        # Only plot tasks that have non-zero counts
+        tasks_to_plot = []
+        for task_name in sorted(all_task_names):
+            has_nonzero = False
+            for data in all_data:
+                if task_name in data["task_series"]:
+                    if np.any(data["task_series"][task_name] > 0):
+                        has_nonzero = True
+                        break
+            if has_nonzero:
+                tasks_to_plot.append(task_name)
+
+    if tasks_to_plot:
+        fig, ax = plt.subplots(figsize=(12, 8))
+
+        # Use a colormap for different task types
+        colors = plt.cm.get_cmap("tab20")(
+            np.linspace(0, 1, len(tasks_to_plot))
+        )
+
+        for task_idx, task_name in enumerate(tasks_to_plot):
+            for log_idx, data in enumerate(all_data):
+                if task_name not in data["task_series"]:
+                    continue
+
+                task_counts = data["task_series"][task_name]
+                # Only plot non-zero values
+                nonzero_mask = task_counts > 0
+                if not np.any(nonzero_mask):
+                    continue
+
+                # Create label only for first log to avoid duplicate legend
+                if len(all_data) == 1:
+                    label = task_name
+                else:
+                    label = f"{task_name} ({data['label']})"
+
+                ax.scatter(
+                    data["times"][nonzero_mask],
+                    task_counts[nonzero_mask],
+                    marker=data["marker"],
+                    s=20,
+                    alpha=0.6,
+                    color=colors[task_idx],
+                    label=label,
+                )
+
+        ax.set_xlabel("Simulation time")
+        ax.set_ylabel("Task count per step")
+        ax.set_title("Individual task types evolution")
+        ax.set_yscale("log")
+        ax.grid(True, alpha=0.3, linestyle="--", which="both")
+        ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=8)
+
+        p3 = create_output_path(
+            output_path, prefix, "task_counts_by_type.png", out_dir
+        )
+        plt.savefig(p3, dpi=300, bbox_inches="tight")
+        if show_plot:
+            plt.show()
+        plt.close()
+
+        print("\nCreated task-count plots:")
+        print(f"  - {p1}")
+        print(f"  - {p2}")
+        print(f"  - {p3}")
+    else:
+        print("\nCreated task-count plots:")
+        print(f"  - {p1}")
+        print(f"  - {p2}")
+        print("  (No individual task plot - no non-zero tasks found)")
